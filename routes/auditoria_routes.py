@@ -3,8 +3,8 @@ from flask_login import login_required
 from datetime import datetime
 
 # IMPORTS CORRECTOS PARA RAILWAY
-from warehouse_mro.models import db
-from warehouse_mro.models.user import User
+from models import db
+from models.user import User
 
 auditoria_bp = Blueprint("auditoria", __name__, url_prefix="/auditoria")
 
@@ -21,3 +21,4 @@ def vista_auditoria():
     ]
 
     return render_template("auditoria/vista_auditoria.html", logs=logs)
+
