@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 
 # IMPORTS CORRECTOS PARA RAILWAY
-from models.bultos import Bulto, PostRegistro
+from models.bultos import PostRegistro
 from models import db
 
 from datetime import datetime
@@ -185,4 +185,5 @@ def historial_post():
     historial = PostRegistro.query.order_by(PostRegistro.fecha_registro.desc()).all()
 
     return render_template("bultos/historial_post.html", historial=historial)
+
 
