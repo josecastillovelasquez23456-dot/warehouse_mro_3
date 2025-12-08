@@ -14,11 +14,11 @@ from flask import (
 from flask_login import login_required
 
 # 📌 IMPORTS CORREGIDOS PARA RAILWAY
-from warehouse_mro.models import db
-from warehouse_mro.models.inventory import InventoryItem
-from warehouse_mro.models.inventory_history import InventoryHistory
+from models import db
+from models.inventory import InventoryItem
+from models.inventory_history import InventoryHistory
 
-from warehouse_mro.utils.excel import (
+from utils.excel import (
     load_inventory_excel,
     sort_location_advanced,
     generate_discrepancies_excel,
@@ -171,3 +171,4 @@ def discrepancies():
         )
 
     return render_template("inventory/discrepancies.html")
+
