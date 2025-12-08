@@ -1,4 +1,4 @@
-from warehouse_mro.models import db
+from models import db
 from datetime import datetime
 import json
 
@@ -68,4 +68,5 @@ class Alert(db.Model):
 
     def __repr__(self):
         return f"<Alerta {self.tipo or self.alert_type}>"
+
 
