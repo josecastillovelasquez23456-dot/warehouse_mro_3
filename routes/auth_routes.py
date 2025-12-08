@@ -8,8 +8,8 @@ from flask_login import (
 )
 
 # IMPORTS CORRECTOS PARA RAILWAY
-from warehouse_mro.models import db
-from warehouse_mro.models.user import User
+from models import db
+from models.user import User
 
 from datetime import datetime
 import os
@@ -218,3 +218,4 @@ def descargar_datos_gerencia():
 
     c.save()
     return send_file(pdf_path, as_attachment=True)
+
