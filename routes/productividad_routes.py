@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, request
 from flask_login import login_required
 
 # IMPORTS CORREGIDOS PARA RAILWAY
-from warehouse_mro.models import db
-from warehouse_mro.models.equipos import Equipo
+from models import db
+from models.equipos import Equipo
 
 productividad_bp = Blueprint("productividad", __name__, url_prefix="/productividad")
 
@@ -69,3 +69,4 @@ def dashboard_productividad():
         meses=meses,
         areas=areas
     )
+
