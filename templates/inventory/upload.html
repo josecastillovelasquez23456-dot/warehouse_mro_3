@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">📥 Cargar Inventario Base (Excel)</h4>
+        </div>
+
+        <div class="card-body">
+
+            <p class="text-muted">
+                Este módulo permite cargar el inventario oficial del sistema MRO.  
+                El archivo será procesado, validado y almacenado como inventario activo.
+            </p>
+
+            <div class="alert alert-info">
+                <strong>Columnas requeridas:</strong><br>
+                <code>Código del Material</code>,
+                <code>Texto breve de material</code>,
+                <code>Unidad de medida base</code>,
+                <code>Ubicación</code>,
+                <code>Libre utilización</code>.
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+
+                <!-- ARCHIVO EXCEL -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Seleccionar archivo Excel</label>
+                    <input 
+                        type="file"
+                        name="file"
+                        class="form-control"
+                        accept=".xlsx,.xls"
+                        required
+                    >
+                    <small class="text-muted">
+                        Acepta formatos: <b>.xlsx</b> y <b>.xls</b>.
+                    </small>
+                </div>
+
+                <!-- BOTONES -->
+                <div class="mt-4 d-flex justify-content-between">
+                    <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-secondary">
+                        ⬅ Volver a Inventario
+                    </a>
+
+                    <button type="submit" class="btn btn-success px-4">
+                        📤 Cargar Inventario
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
