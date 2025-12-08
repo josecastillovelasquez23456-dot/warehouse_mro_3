@@ -1,4 +1,4 @@
-from warehouse_mro.models import db
+from models import db
 from datetime import datetime
 
 class Productividad(db.Model):
@@ -12,4 +12,5 @@ class Productividad(db.Model):
 
     def __repr__(self):
         return f"<Productividad {self.usuario} - {self.actividad}>"
+
 
