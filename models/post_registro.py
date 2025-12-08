@@ -5,7 +5,7 @@ class PostRegistro(db.Model):
     __tablename__ = "post_registro"
 
     id = db.Column(db.Integer, primary_key=True)
-    bulto_id = db.Column(db.Integer, db.ForeignKey("bultos.id"))
+    bulto_id = db.Column(db.Integer, db.ForeignKey("bulto.id"))  # FIX AQUÍ
     codigo_material = db.Column(db.String(120))
     cantidad_sistema = db.Column(db.Integer)
     cantidad_real = db.Column(db.Integer)
