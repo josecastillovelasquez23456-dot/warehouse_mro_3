@@ -13,10 +13,10 @@ from flask import (
 from flask_login import login_required, current_user
 
 # ✅ IMPORTS CORREGIDOS PARA RAILWAY
-from warehouse_mro.models import db
-from warehouse_mro.models.warehouse2d import WarehouseLocation
-from warehouse_mro.models.alerts import Alert
-from warehouse_mro.utils.excel import load_warehouse2d_excel, sort_location_advanced
+from models import db
+from models.warehouse2d import WarehouseLocation
+from models.alerts import Alert
+from utils.excel import load_warehouse2d_excel, sort_location_advanced
 
 warehouse2d_bp = Blueprint("warehouse2d", __name__, url_prefix="/warehouse2d")
 
@@ -196,3 +196,4 @@ def location_detail(ubicacion):
         "ubicacion": ubicacion,
         "items": detalle,
     })
+
