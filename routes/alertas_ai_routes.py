@@ -4,7 +4,7 @@ from flask import Blueprint, render_template
 from flask_login import login_required
 
 # Import correcto para Railway
-from warehouse_mro.models.alertas_ai import AlertaIA
+from models.alertas_ai import AlertaIA
 
 alertas_ai_bp = Blueprint("alertas_ai", __name__, url_prefix="/alertas-ai")
 
@@ -55,3 +55,4 @@ def listado_ai():
 
     # Renderizar vista
     return render_template("alertas_ai/listado_ai.html", alertas=alertas)
+
