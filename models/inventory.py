@@ -1,4 +1,4 @@
-from warehouse_mro.models import db
+from models import db
 from datetime import datetime
 
 class InventoryItem(db.Model):
@@ -24,3 +24,4 @@ class InventoryItem(db.Model):
         if self.libre_utilizacion <= 15:
             return "bajo"
         return "normal"
+
