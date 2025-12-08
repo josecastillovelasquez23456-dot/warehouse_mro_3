@@ -2,8 +2,8 @@ from flask import Blueprint, jsonify, send_file
 from flask_login import current_user
 
 # ✔ IMPORTS CORREGIDOS PARA RAILWAY
-from warehouse_mro.models.turnos import RegistroTurno
-from warehouse_mro.models import db
+from models.turnos import RegistroTurno
+from models import db
 
 from datetime import date
 import qrcode
@@ -46,3 +46,4 @@ def qr(codigo):
     img.save(buffer, "PNG")
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
+
