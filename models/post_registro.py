@@ -1,4 +1,4 @@
-from warehouse_mro.models import db
+from models import db
 from datetime import datetime
 
 class PostRegistro(db.Model):
