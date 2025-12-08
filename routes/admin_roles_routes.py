@@ -4,8 +4,8 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
 # IMPORTS ABSOLUTOS (REQUIRED PARA RAILWAY)
-from warehouse_mro.models.user import User
-from warehouse_mro.models import db
+from models.user import User
+from models import db
 
 admin_roles_bp = Blueprint("admin_roles", __name__, url_prefix="/roles")
 
@@ -65,3 +65,4 @@ def cambiar_rol(user_id):
 
     flash(f"Rol actualizado a {nuevo_rol.upper()} correctamente.", "success")
     return redirect(url_for("admin_roles.listar_roles"))
+
