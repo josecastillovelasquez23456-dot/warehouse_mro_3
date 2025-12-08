@@ -4,12 +4,12 @@ from sqlalchemy import func
 from datetime import date
 
 # IMPORTS CORRECTOS PARA RAILWAY
-from warehouse_mro.models.inventory import InventoryItem
-from warehouse_mro.models.bultos import Bulto
-from warehouse_mro.models.alerts import Alert
-from warehouse_mro.models.warehouse2d import WarehouseLocation
-from warehouse_mro.models.technician_error import TechnicianError
-from warehouse_mro.models.equipos import Equipo
+from models.inventory import InventoryItem
+from models.bultos import Bulto
+from models.alerts import Alert
+from models.warehouse2d import WarehouseLocation
+from models.technician_error import TechnicianError
+from models.equipos import Equipo
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -107,3 +107,4 @@ def dashboard():
         estado_labels=estado_labels,
         estado_values=estado_values
     )
+
