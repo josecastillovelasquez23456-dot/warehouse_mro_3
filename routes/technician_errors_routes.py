@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 # ✔ IMPORTS CORREGIDOS PARA RAILWAY
-from warehouse_mro.models import db
-from warehouse_mro.models.technician_error import TechnicianError
+from models import db
+from models.technician_error import TechnicianError
 
 from datetime import datetime
 from sqlalchemy import func
@@ -153,3 +153,4 @@ def reporte_pdf():
     c.save()
 
     return send_file(pdf_path, as_attachment=True)
+
