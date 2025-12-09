@@ -10,7 +10,7 @@ from flask import (
     url_for,
     flash,
     send_file,
-    jsonify
+    jsonify,
 )
 from flask_login import login_required
 
@@ -33,7 +33,6 @@ inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 # =============================================================================
 # 1. SUBIR INVENTARIO BASE
 # =============================================================================
-
 @inventory_bp.route("/upload", methods=["GET", "POST"])
 @login_required
 def upload_inventory():
@@ -51,7 +50,7 @@ def upload_inventory():
             flash(f"Error procesando archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory"))
 
-        # Limpiar inventario anterior
+        # Limpiar inventario anterior y conteos
         InventoryItem.query.delete()
         InventoryCount.query.delete()
         db.session.commit()
@@ -68,7 +67,7 @@ def upload_inventory():
                 )
             )
 
-        # Guardar histórico
+        # Guardar snapshot histórico
         snapshot_id = str(uuid.uuid4())
         snapshot_name = f"Inventario {datetime.now():%d/%m/%Y %H:%M}"
 
@@ -93,9 +92,51 @@ def upload_inventory():
 
 
 # =============================================================================
-# 2. LISTA DE INVENTARIO
+# 2. SUBIR INVENTARIOS HISTÓRICOS (PARA EL MENÚ LATERAL)
 # =============================================================================
+@inventory_bp.route("/upload-history", methods=["GET", "POST"])
+@login_required
+def upload_inventory_history():
 
+    if request.method == "POST":
+        file = request.files.get("file")
+
+        if not file:
+            flash("Debes seleccionar un archivo Excel.", "warning")
+            return redirect(url_for("inventory.upload_inventory_history"))
+
+        try:
+            df = load_inventory_excel(file)
+        except Exception as e:
+            flash(f"Error procesando archivo: {str(e)}", "danger")
+            return redirect(url_for("inventory.upload_inventory_history"))
+
+        snapshot_id = str(uuid.uuid4())
+        snapshot_name = f"Histórico {datetime.now():%d/%m/%Y %H:%M}"
+
+        for _, row in df.iterrows():
+            db.session.add(
+                InventoryHistory(
+                    snapshot_id=snapshot_id,
+                    snapshot_name=snapshot_name,
+                    material_code=row["Código del Material"],
+                    material_text=row["Texto breve de material"],
+                    base_unit=row["Unidad de medida base"],
+                    location=row["Ubicación"],
+                    libre_utilizacion=row["Libre utilización"],
+                )
+            )
+
+        db.session.commit()
+        flash("Inventario histórico subido correctamente.", "success")
+        return redirect(url_for("inventory.list_inventory"))
+
+    return render_template("inventory/upload_history.html")
+
+
+# =============================================================================
+# 3. LISTA DE INVENTARIO
+# =============================================================================
 @inventory_bp.route("/list")
 @login_required
 def list_inventory():
@@ -105,9 +146,8 @@ def list_inventory():
 
 
 # =============================================================================
-# 3. CONTEO DE INVENTARIO
+# 4. CONTEO DE INVENTARIO (EN LÍNEA)
 # =============================================================================
-
 @inventory_bp.route("/count")
 @login_required
 def count_inventory():
@@ -117,9 +157,8 @@ def count_inventory():
 
 
 # =============================================================================
-# 4. GUARDAR CONTEO (FRONT-END)
+# 5. GUARDAR CONTEO (VIENE DEL FRONT)
 # =============================================================================
-
 @inventory_bp.route("/save-count", methods=["POST"])
 @login_required
 def save_count():
@@ -138,7 +177,7 @@ def save_count():
                 material_code=c["material_code"],
                 location=c["location"],
                 real_count=int(c["real_count"]),
-                fecha=datetime.now()
+                fecha=datetime.now(),
             )
             db.session.add(nuevo)
 
@@ -151,12 +190,15 @@ def save_count():
 
 
 # =============================================================================
-# 5. EXPORTAR DISCREPANCIAS DESDE EL CONTEO EN PANTALLA
+# 6. EXPORTAR DISCREPANCIAS DESDE EL CONTEO EN PANTALLA
 # =============================================================================
-
 @inventory_bp.route("/export-discrepancies", methods=["POST"])
 @login_required
 def export_discrepancies_auto():
+    """
+    Recibe el conteo actual desde el front (JSON),
+    cruza con InventoryItem y devuelve un Excel profesional de discrepancias.
+    """
 
     try:
         conteo = request.get_json()
@@ -171,21 +213,25 @@ def export_discrepancies_auto():
                 InventoryItem.material_text.label("Descripción"),
                 InventoryItem.base_unit.label("Unidad"),
                 InventoryItem.location.label("Ubicación"),
-                InventoryItem.libre_utilizacion.label("Stock sistema")
+                InventoryItem.libre_utilizacion.label("Stock sistema"),
             ).statement,
-            db.session.bind
+            db.session.bind,
         )
 
-        # Convertir conteo recibido
+        # Conteo recibido desde el front
         conteo_df = pd.DataFrame(conteo)
-        conteo_df = conteo_df.rename(columns={
-            "material_code": "Código Material",
-            "location": "Ubicación",
-            "real_count": "Stock contado"
-        })
+        conteo_df = conteo_df.rename(
+            columns={
+                "material_code": "Código Material",
+                "location": "Ubicación",
+                "real_count": "Stock contado",
+            }
+        )
 
         # Mezclar inventario real y sistema
-        merged = sistema.merge(conteo_df, on=["Código Material", "Ubicación"], how="outer")
+        merged = sistema.merge(
+            conteo_df, on=["Código Material", "Ubicación"], how="outer"
+        )
         merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
         merged["Stock contado"] = merged["Stock contado"].fillna(0)
         merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
@@ -217,3 +263,46 @@ def export_discrepancies_auto():
     except Exception as e:
         print("❌ ERROR EXPORT-DISCREP:", e)
         return jsonify({"success": False, "msg": "Error generando Excel"}), 500
+
+
+# =============================================================================
+# 7. DASHBOARD DE INVENTARIO (PARA EL SIDEBAR)
+# =============================================================================
+@inventory_bp.route("/dashboard")
+@login_required
+def dashboard_inventory():
+    items = InventoryItem.query.all()
+
+    total_items = len(items)
+    ubicaciones_unicas = len(set(i.location for i in items))
+
+    criticos = sum(1 for i in items if i.libre_utilizacion <= 0)
+    faltantes = sum(1 for i in items if 0 < i.libre_utilizacion < 5)
+
+    estados = {"OK": 0, "FALTA": 0, "CRITICO": 0, "SOBRA": 0}
+
+    for i in items:
+        if i.libre_utilizacion == 0:
+            estados["CRITICO"] += 1
+        elif i.libre_utilizacion < 5:
+            estados["FALTA"] += 1
+        elif i.libre_utilizacion > 50:
+            estados["SOBRA"] += 1
+        else:
+            estados["OK"] += 1
+
+    ubicaciones = {}
+    for i in items:
+        ubicaciones[i.location] = ubicaciones.get(i.location, 0) + 1
+
+    return render_template(
+        "inventory/dashboard.html",
+        total_items=total_items,
+        ubicaciones_unicas=ubicaciones_unicas,
+        criticos=criticos,
+        faltantes=faltantes,
+        estados=estados,
+        ubicaciones_labels=list(ubicaciones.keys()),
+        ubicaciones_counts=list(ubicaciones.values()),
+        items=items,
+    )
