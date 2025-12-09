@@ -13,7 +13,7 @@ from flask import (
 )
 from flask_login import login_required
 
-# 📌 IMPORTS CORREGIDOS PARA RAILWAY
+# 📌 IMPORTS PARA RAILWAY
 from models import db
 from models.inventory import InventoryItem
 from models.inventory_history import InventoryHistory
@@ -27,9 +27,9 @@ from utils.excel import (
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
 
-# =====================================================
-# CARGA DE INVENTARIO BASE
-# =====================================================
+# ============================================================================
+# 📌 1. CARGA DE INVENTARIO BASE
+# ============================================================================
 
 @inventory_bp.route("/upload", methods=["GET", "POST"])
 @login_required
@@ -48,9 +48,11 @@ def upload_inventory():
             flash(f"Error procesando el archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory"))
 
+        # Reemplazar inventario existente
         InventoryItem.query.delete()
         db.session.commit()
 
+        # Guardar inventario en la tabla principal
         for _, row in df.iterrows():
             item = InventoryItem(
                 material_code=row["Código del Material"],
@@ -61,6 +63,7 @@ def upload_inventory():
             )
             db.session.add(item)
 
+        # Crear snapshot del inventario
         snapshot_id = str(uuid.uuid4())
         snapshot_name = f"Inventario {datetime.now():%d/%m/%Y %H:%M}"
 
@@ -84,23 +87,81 @@ def upload_inventory():
     return render_template("inventory/upload.html")
 
 
-# =====================================================
-# LISTAR INVENTARIO
-# =====================================================
+
+# ============================================================================
+# 📌 2. SUBIR INVENTARIOS ANTIGUOS
+# ============================================================================
+
+@inventory_bp.route("/upload-history", methods=["GET", "POST"])
+@login_required
+def upload_inventory_history():
+
+    if request.method == "POST":
+        file = request.files.get("file")
+
+        if not file:
+            flash("Debes seleccionar un archivo Excel.", "warning")
+            return redirect(url_for("inventory.upload_inventory_history"))
+
+        try:
+            df = load_inventory_excel(file)
+        except Exception as e:
+            flash(f"Error procesando el archivo: {str(e)}", "danger")
+            return redirect(url_for("inventory.upload_inventory_history"))
+
+        snapshot_id = str(uuid.uuid4())
+        snapshot_name = f"Histórico {datetime.now():%d/%m/%Y %H:%M}"
+
+        # Guardar archivo en la tabla de historial
+        for _, row in df.iterrows():
+            hist = InventoryHistory(
+                snapshot_id=snapshot_id,
+                snapshot_name=snapshot_name,
+                material_code=row["Código del Material"],
+                material_text=row["Texto breve de material"],
+                base_unit=row["Unidad de medida base"],
+                location=row["Ubicación"],
+                libre_utilizacion=row["Libre utilización"],
+            )
+            db.session.add(hist)
+
+        db.session.commit()
+        flash("Inventario histórico subido correctamente.", "success")
+        return redirect(url_for("inventory.list_inventory"))
+
+    return render_template("inventory/upload_history.html")
+
+
+
+# ============================================================================
+# 📌 3. LISTAR INVENTARIO (DEFAULT)
+# ============================================================================
 
 @inventory_bp.route("/list")
 @login_required
 def list_inventory():
-
     items = InventoryItem.query.all()
     items_sorted = sorted(items, key=lambda x: sort_location_advanced(x.location))
-
     return render_template("inventory/list.html", items=items_sorted)
 
 
-# =====================================================
-# DISCREPANCIAS
-# =====================================================
+
+# ============================================================================
+# 📌 4. CONTEO EN LÍNEA
+# ============================================================================
+
+@inventory_bp.route("/count")
+@login_required
+def count_inventory():
+    items = InventoryItem.query.all()
+    items_sorted = sorted(items, key=lambda x: sort_location_advanced(x.location))
+    return render_template("inventory/count.html", items=items_sorted)
+
+
+
+# ============================================================================
+# 📌 5. DISCREPANCIAS
+# ============================================================================
 
 @inventory_bp.route("/discrepancies", methods=["GET", "POST"])
 @login_required
@@ -108,6 +169,7 @@ def discrepancies():
 
     if request.method == "POST":
         file = request.files.get("file")
+
         if not file:
             flash("Debe seleccionar un archivo.", "warning")
             return redirect(url_for("inventory.discrepancies"))
@@ -121,6 +183,7 @@ def discrepancies():
         df["Código del Material"] = df["Código del Material"].astype(str)
         df["Ubicación"] = df["Ubicación"].astype(str)
 
+        # Inventario del sistema
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -132,6 +195,7 @@ def discrepancies():
             db.session.bind
         )
 
+        # Inventario contado
         conteo = df.groupby(
             ["Código del Material", "Ubicación"], as_index=False
         )["Libre utilización"].sum()
@@ -141,6 +205,7 @@ def discrepancies():
             "Libre utilización": "Stock contado"
         })
 
+        # Mezclar ambos
         merged = sistema.merge(conteo, on=["Código Material", "Ubicación"], how="outer")
 
         merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
@@ -160,6 +225,7 @@ def discrepancies():
 
         merged["Estado"] = estados
 
+        # Exportar Excel
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -171,4 +237,3 @@ def discrepancies():
         )
 
     return render_template("inventory/discrepancies.html")
-
