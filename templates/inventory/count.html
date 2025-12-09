@@ -7,15 +7,23 @@
 
 <div class="card shadow-sm p-4">
 
-    <!-- ========================== BUSCADOR + BOTÓN ========================== -->
+    <!-- ========================== BUSCADOR + BOTONES ========================== -->
     <div class="d-flex justify-content-between align-items-center mb-3">
 
-        <input type="text" id="searchCount" class="form-control w-50 shadow-sm"
+        <input type="text" id="searchCount"
+               class="form-control w-50 shadow-sm"
                placeholder="🔍 Buscar material, texto o ubicación…">
 
-        <button id="saveCountBtn" class="btn btn-success btn-lg shadow-sm">
-            <i class="bi bi-cloud-check me-2"></i> Guardar Conteo
-        </button>
+        <div>
+            <a href="{{ url_for('inventory.discrepancies') }}"
+               class="btn btn-primary btn-lg shadow-sm me-2">
+                <i class="bi bi-file-earmark-excel me-2"></i> Exportar Discrepancias
+            </a>
+
+            <button id="saveCountBtn" class="btn btn-success btn-lg shadow-sm">
+                <i class="bi bi-cloud-check me-2"></i> Guardar Conteo
+            </button>
+        </div>
 
     </div>
 
@@ -39,6 +47,7 @@
                     <td>{{ i.material_text }}</td>
                     <td class="text-primary fw-bold">{{ i.location }}</td>
                     <td class="text-center">{{ i.libre_utilizacion }}</td>
+
                     <td class="text-center" style="width: 180px;">
                         <input type="number"
                                min="0"
@@ -56,7 +65,9 @@
 
 <!-- ========================== SCRIPTS ========================== -->
 <script>
+// ==================================================
 // 🔍 BÚSQUEDA EN TIEMPO REAL
+// ==================================================
 document.getElementById("searchCount").addEventListener("input", function () {
     const filter = this.value.toLowerCase();
     document.querySelectorAll("#countTable tbody tr").forEach(row => {
@@ -64,13 +75,22 @@ document.getElementById("searchCount").addEventListener("input", function () {
     });
 });
 
-// 🎨 EFECTO VISUAL AL MODIFICAR EL INPUT
+
+// ==================================================
+// 🎨 EFECTOS EN INPUTS
+// ==================================================
 document.querySelectorAll(".count-input").forEach(input => {
+
+    // Fondo según si está lleno o vacío
     input.addEventListener("input", () => {
-        input.style.backgroundColor = input.value === "" ? "#ffe5e5" : "#e6ffe6";
+        input.style.backgroundColor = input.value.trim() === "" ? "#ffe5e5" : "#e6ffe6";
+
+        // Resaltar toda la fila cuando se modifica
+        const row = input.closest("tr");
+        row.style.backgroundColor = "#f7fff0";
     });
 
-    // ENTER → pasa al siguiente
+    // ENTER → pasa al siguiente input
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
             const inputs = [...document.querySelectorAll(".count-input")];
@@ -78,23 +98,27 @@ document.querySelectorAll(".count-input").forEach(input => {
             if (inputs[idx + 1]) inputs[idx + 1].focus();
         }
     });
+
 });
 
+
+// ==================================================
 // 📝 GUARDAR CONTEO
+// ==================================================
 document.getElementById("saveCountBtn").addEventListener("click", () => {
 
     const conteos = [];
 
     document.querySelectorAll("#countTable tbody tr").forEach(row => {
-        const codigo = row.dataset.code;
-        const ubicacion = row.dataset.loc;
+        const material_code = row.dataset.code;
+        const location = row.dataset.loc;
         const input = row.querySelector(".count-input").value.trim();
 
         if (input !== "") {
             conteos.push({
-                codigo,
-                ubicacion,
-                real: Number(input)
+                material_code,
+                location,
+                real_count: Number(input)
             });
         }
     });
@@ -112,6 +136,12 @@ document.getElementById("saveCountBtn").addEventListener("click", () => {
     .then(data => {
         if (data.ok) {
             alert("✅ Conteo guardado correctamente.");
+
+            // Limpia colores de edición
+            document.querySelectorAll(".count-input").forEach(i => {
+                i.style.backgroundColor = "white";
+            });
+
         } else {
             alert("❌ Error guardando conteo.");
         }
