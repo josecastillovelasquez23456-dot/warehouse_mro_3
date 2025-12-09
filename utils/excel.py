@@ -73,56 +73,80 @@ def load_warehouse2d_excel(file):
 # 📌 4. GENERAR EXCEL PROFESIONAL DE DISCREPANCIAS (VERSION FIJA)
 # =====================================================================
 def generate_discrepancies_excel(df):
+    """
+    Genera un archivo Excel válido (sin corrupción).
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from io import BytesIO
+
     output = BytesIO()
 
-    # VALIDACIÓN: si llega vacío, crear un Excel válido para evitar corrupción
+    # VALIDACIÓN SI DF VIENE VACÍO
     if df is None or df.empty:
         wb = Workbook()
         ws = wb.active
         ws.title = "Discrepancias"
-        ws.append(["SIN DATOS", "El DataFrame llegó vacío"])
+        ws.append(["SIN DATOS"])
         wb.save(output)
         output.seek(0)
         return output
 
-    # Normalización fuerte para evitar corrupción
+    # NORMALIZACIÓN PARA EVITAR VALORES NO SERIALIZABLES
     df = df.copy()
     for col in df.columns:
-        if "Material" in col or "Ubicación" in col:
-            df[col] = df[col].astype(str)
-
-    df["Stock sistema"] = pd.to_numeric(df["Stock sistema"], errors="coerce").fillna(0)
-    df["Stock contado"] = pd.to_numeric(df["Stock contado"], errors="coerce").fillna(0)
-    df["Diferencia"] = pd.to_numeric(df["Diferencia"], errors="coerce").fillna(0)
+        df[col] = df[col].astype(str)
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Discrepancias"
 
-    # DataFrame a Excel
-    for r in dataframe_to_rows(df, index=False, header=True):
-        ws.append(r)
+    # ESCRIBIR CABECERAS
+    ws.append(list(df.columns))
 
-    # Estilos
-    header_font = Font(bold=True, color="FFFFFF", size=12)
+    # ESCRIBIR FILAS
+    for _, row in df.iterrows():
+        ws.append(row.tolist())
+
+    # ESTILOS
+    header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="1F4E78")
-    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    center = Alignment(horizontal="center", vertical="center")
 
-    border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
-    # Encabezados
     for cell in ws[1]:
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = center
-        cell.border = border
 
-    # Auto ancho
+    thin = Side(border_style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    # BORDES Y AUTOAJUSTE
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            cell.border = border
+            cell.alignment = center
+
+    # COLORES POR ESTADO
+    status_colors = {
+        "OK": "C6EFCE",
+        "FALTA": "FFEB9C",
+        "CRÍTICO": "FFC7CE",
+        "SOBRA": "BDD7EE",
+    }
+
+    if "Estado" in df.columns:
+        estado_idx = df.columns.get_loc("Estado") + 1  # Excel es 1-indexed
+
+        for row in ws.iter_rows(min_row=2):
+            estado = row[estado_idx - 1].value
+            color = status_colors.get(estado)
+
+            if color:
+                for cell in row:
+                    cell.fill = PatternFill("solid", fgColor=color)
+
+    # AUTO-ANCHO
     for col in ws.columns:
         max_len = 0
         col_letter = col[0].column_letter
@@ -133,30 +157,10 @@ def generate_discrepancies_excel(df):
                 pass
         ws.column_dimensions[col_letter].width = max_len + 3
 
-    # Colores según estado
-    colors = {
-        "OK": "C6EFCE",
-        "FALTA": "FFEB9C",
-        "CRÍTICO": "FFC7CE",
-        "SOBRA": "BDD7EE",
-    }
-
-    estado_index = df.columns.get_loc("Estado")
-
-    for row in ws.iter_rows(min_row=2):
-        estado = row[estado_index].value
-        color = colors.get(estado)
-
-        for cell in row:
-            cell.border = border
-            cell.alignment = center
-
-        if color:
-            for cell in row:
-                cell.fill = PatternFill("solid", fgColor=color)
-
+    # FILTRO AUTOMÁTICO
     ws.auto_filter.ref = ws.dimensions
 
     wb.save(output)
     output.seek(0)
+
     return output
