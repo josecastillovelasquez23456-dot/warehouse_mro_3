@@ -196,8 +196,8 @@ def save_count():
 @login_required
 def export_discrepancies_auto():
     """
-    Recibe el conteo actual desde el front (JSON),
-    cruza con InventoryItem y devuelve un Excel profesional de discrepancias.
+    Recibe el conteo actual desde el front,
+    cruza con InventoryItem y devuelve un Excel válido.
     """
 
     try:
@@ -218,28 +218,27 @@ def export_discrepancies_auto():
             db.session.bind,
         )
 
-        # Conteo recibido desde el front
+        # Conteo ingresado
         conteo_df = pd.DataFrame(conteo)
-        conteo_df = conteo_df.rename(
-            columns={
-                "material_code": "Código Material",
-                "location": "Ubicación",
-                "real_count": "Stock contado",
-            }
-        )
+        conteo_df = conteo_df.rename(columns={
+            "material_code": "Código Material",
+            "location": "Ubicación",
+            "real_count": "Stock contado",
+        })
 
-        # Mezclar inventario real y sistema
+        # Merge sistema + conteo
         merged = sistema.merge(
             conteo_df, on=["Código Material", "Ubicación"], how="outer"
         )
+
         merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
         merged["Stock contado"] = merged["Stock contado"].fillna(0)
         merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
 
-        # Determinar estado
+        # Estado
         estados = []
         for _, r in merged.iterrows():
-            diff = r["Diferencia"]
+            diff = float(r["Diferencia"])
             if diff == 0:
                 estados.append("OK")
             elif diff < 0:
@@ -249,7 +248,7 @@ def export_discrepancies_auto():
 
         merged["Estado"] = estados
 
-        # Exportar Excel
+        # Excel final
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -257,14 +256,14 @@ def export_discrepancies_auto():
             excel,
             as_attachment=True,
             download_name=fname,
-            mimetype="application/vnd.ms-excel"
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            max_age=0,
+            conditional=False
         )
-
 
     except Exception as e:
         print("❌ ERROR EXPORT-DISCREP:", e)
         return jsonify({"success": False, "msg": "Error generando Excel"}), 500
-
 
 # =============================================================================
 # 7. DASHBOARD DE INVENTARIO (PARA EL SIDEBAR)
@@ -307,4 +306,5 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
+
 
