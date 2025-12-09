@@ -15,7 +15,7 @@
         <div class="d-flex gap-2">
 
             <!-- 🔥 BOTÓN DE DISCREPANCIAS (AGREGADO) -->
-            <a href="{{ url_for('inventory.discrepancies') }}"
+            <a href="{{ url_for('inventory.export_discrepancies_auto') }}"
                class="btn btn-danger">
                 <i class="bi bi-exclamation-triangle me-2"></i>
                 Generar Discrepancias (Excel)
@@ -72,3 +72,4 @@ document.getElementById("searchInput").addEventListener("keyup", function() {
 </script>
 
 {% endblock %}
+
