@@ -12,12 +12,25 @@
         <input type="text" id="searchInput" class="form-control w-50"
                placeholder="🔍 Buscar por material, texto o ubicación...">
 
-        <a href="{{ url_for('inventory.count_inventory') }}"
-           class="btn btn-outline-primary">
-            <i class="bi bi-pencil-square me-2"></i> Conteo en línea
-        </a>
+        <div class="d-flex gap-2">
+
+            <!-- 🔥 BOTÓN DE DISCREPANCIAS (AGREGADO) -->
+            <a href="{{ url_for('inventory.discrepancies') }}"
+               class="btn btn-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Generar Discrepancias (Excel)
+            </a>
+
+            <!-- ✔ BOTÓN DE CONTEO EN LÍNEA -->
+            <a href="{{ url_for('inventory.count_inventory') }}"
+               class="btn btn-outline-primary">
+                <i class="bi bi-pencil-square me-2"></i> Conteo en línea
+            </a>
+
+        </div>
 
     </div>
+
 
     <div class="table-responsive">
         <table class="table table-hover" id="inventoryTable">
