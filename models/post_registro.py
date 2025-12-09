@@ -5,7 +5,8 @@ class PostRegistro(db.Model):
     __tablename__ = "post_registro"
 
     id = db.Column(db.Integer, primary_key=True)
-    bulto_id = db.Column(db.Integer, db.ForeignKey("bulto.id"))  # FIX AQUÍ
+    bulto_id = db.Column(db.Integer, db.ForeignKey("bultos.id"), nullable=False)
+
     codigo_material = db.Column(db.String(120))
     cantidad_sistema = db.Column(db.Integer)
     cantidad_real = db.Column(db.Integer)
@@ -14,4 +15,4 @@ class PostRegistro(db.Model):
     fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return f"<PostRegistro {self.codigo_material} dif={self.diferencia}>"
+        return f"<PostRegistro {self.id}>"
