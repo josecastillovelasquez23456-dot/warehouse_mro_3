@@ -20,3 +20,5 @@ from .auditoria import Auditoria
 from .inventory_history import InventoryHistory
 from .warehouse2d import WarehouseLocation
 from .actividad import ActividadUsuario
+from .inventory_count import InventoryCount
+
