@@ -29,8 +29,9 @@ from utils.excel import (
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
+
 # =============================================================================
-# 1. CARGAR INVENTARIO PRINCIPAL
+# 1. SUBIR INVENTARIO BASE
 # =============================================================================
 
 @inventory_bp.route("/upload", methods=["GET", "POST"])
@@ -47,15 +48,15 @@ def upload_inventory():
         try:
             df = load_inventory_excel(file)
         except Exception as e:
-            flash(f"Error procesando el archivo: {str(e)}", "danger")
+            flash(f"Error procesando archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory"))
 
-        # Reemplazar inventario actual
+        # Limpiar inventario anterior
         InventoryItem.query.delete()
         InventoryCount.query.delete()
         db.session.commit()
 
-        # Guardar inventario
+        # Guardar inventario nuevo
         for _, row in df.iterrows():
             db.session.add(
                 InventoryItem(
@@ -67,7 +68,7 @@ def upload_inventory():
                 )
             )
 
-        # Guardar snapshot histórico
+        # Guardar histórico
         snapshot_id = str(uuid.uuid4())
         snapshot_name = f"Inventario {datetime.now():%d/%m/%Y %H:%M}"
 
@@ -92,7 +93,7 @@ def upload_inventory():
 
 
 # =============================================================================
-# 2. LISTA INVENTARIO
+# 2. LISTA DE INVENTARIO
 # =============================================================================
 
 @inventory_bp.route("/list")
@@ -104,7 +105,7 @@ def list_inventory():
 
 
 # =============================================================================
-# 3. CONTEO EN LÍNEA
+# 3. CONTEO DE INVENTARIO
 # =============================================================================
 
 @inventory_bp.route("/count")
@@ -116,7 +117,7 @@ def count_inventory():
 
 
 # =============================================================================
-# 4. GUARDAR CONTEO REAL – ARREGLADO
+# 4. GUARDAR CONTEO (FRONT-END)
 # =============================================================================
 
 @inventory_bp.route("/save-count", methods=["POST"])
@@ -126,11 +127,12 @@ def save_count():
         data = request.get_json()
 
         if not isinstance(data, list):
-            return jsonify({"success": False, "msg": "Datos inválidos"}), 400
+            return jsonify({"success": False, "msg": "Formato inválido"}), 400
 
-        # Limpia conteo anterior
+        # Limpiar conteo previo
         InventoryCount.query.delete()
 
+        # Insertar conteo nuevo
         for c in data:
             nuevo = InventoryCount(
                 material_code=c["material_code"],
@@ -149,15 +151,12 @@ def save_count():
 
 
 # =============================================================================
-# 5. EXPORTACIÓN AUTOMÁTICA DE DISCREPANCIAS
+# 5. EXPORTAR DISCREPANCIAS DESDE EL CONTEO EN PANTALLA
 # =============================================================================
 
 @inventory_bp.route("/export-discrepancies", methods=["POST"])
 @login_required
 def export_discrepancies_auto():
-    """
-    Genera Excel con las discrepancias a partir del conteo ingresado en pantalla.
-    """
 
     try:
         conteo = request.get_json()
@@ -165,7 +164,7 @@ def export_discrepancies_auto():
         if not conteo:
             return jsonify({"success": False, "msg": "No se recibió conteo"}), 400
 
-        # Inventario real del sistema
+        # Inventario sistema base
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -177,7 +176,7 @@ def export_discrepancies_auto():
             db.session.bind
         )
 
-        # Convertir conteo del front a DataFrame
+        # Convertir conteo recibido
         conteo_df = pd.DataFrame(conteo)
         conteo_df = conteo_df.rename(columns={
             "material_code": "Código Material",
@@ -185,13 +184,13 @@ def export_discrepancies_auto():
             "real_count": "Stock contado"
         })
 
-        # Mezcla
+        # Mezclar inventario real y sistema
         merged = sistema.merge(conteo_df, on=["Código Material", "Ubicación"], how="outer")
         merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
         merged["Stock contado"] = merged["Stock contado"].fillna(0)
         merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
 
-        # Estado
+        # Determinar estado
         estados = []
         for _, r in merged.iterrows():
             diff = r["Diferencia"]
@@ -204,6 +203,7 @@ def export_discrepancies_auto():
 
         merged["Estado"] = estados
 
+        # Exportar Excel
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
