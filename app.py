@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, jsonify
 from flask_login import LoginManager
 from config import Config
 from models import db
@@ -27,7 +27,7 @@ def create_app():
     app.config.from_object(Config)
 
     # =====================================================
-    # FIX PARA CARPETAS DE ESCRITURA
+    # CREAR CARPETAS NECESARIAS
     # =====================================================
     REQUIRED_DIRS = [
         "uploads",
@@ -37,38 +37,64 @@ def create_app():
         "reports",
     ]
 
-    for d in REQUIRED_DIRS:
-        path = os.path.join(app.root_path, d)
+    for folder in REQUIRED_DIRS:
+        path = os.path.join(app.root_path, folder)
         try:
             os.makedirs(path, exist_ok=True)
-            print(f"✔ Carpeta disponible: {path}")
+            print(f"✔ Carpeta verificada: {path}")
         except Exception as e:
             print(f"✖ ERROR creando carpeta {path}: {e}")
 
     # =====================================================
-    # Inicializar extensiones
+    # INICIALIZAR EXTENSIONES
     # =====================================================
     db.init_app(app)
     login_manager.init_app(app)
 
-    # Blueprints
+    # Registrar Blueprints
     register_blueprints(app)
 
-    # Filtro de fecha
+    # =====================================================
+    # FIX GLOBAL — DESACTIVA COMPRESIÓN (EVITA EXCEL CORRUPTOS)
+    # =====================================================
+    @app.after_request
+    def disable_compression(response):
+        response.headers["Content-Encoding"] = "identity"
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    # =====================================================
+    # FORMATEO DE FECHA
+    # =====================================================
     @app.template_filter("format_fecha")
     def format_fecha(value):
         try:
             return value.strftime("%d/%m/%Y %H:%M")
-        except Exception:
+        except:
             return value
 
-    # Ruta raíz
+    # =====================================================
+    # RUTA RAIZ → LOGIN
+    # =====================================================
     @app.route("/")
     def index():
         return redirect(url_for("auth.login"))
 
     # =====================================================
-    # Crear tablas y OWNER
+    # GLOBAL ERROR HANDLER (PRODUCCIÓN)
+    # =====================================================
+    @app.errorhandler(500)
+    def server_error(e):
+        print("❌ ERROR 500:", e)
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({"error": "Ruta no encontrada"}), 404
+
+    # =====================================================
+    # CREAR TABLAS Y OWNER
     # =====================================================
     with app.app_context():
         print("\n>>> Creando tablas si no existen...")
@@ -76,22 +102,23 @@ def create_app():
         db.session.commit()
         print(">>> Tablas listas.\n")
 
-        owner_email = "jose.castillo@sider.com.pe"
-        owner_username = "JCASTI15"
-        owner_password = "Admin123#"
+        # OWNER predeterminado
+        OWNER_EMAIL = "jose.castillo@sider.com.pe"
+        OWNER_USERNAME = "JCASTI15"
+        OWNER_PASSWORD = "Admin123#"
 
-        owner = User.query.filter_by(email=owner_email).first()
+        owner = User.query.filter_by(email=OWNER_EMAIL).first()
 
         if not owner:
             print(">>> Creando usuario OWNER...")
             new_owner = User(
-                username=owner_username,
-                email=owner_email,
+                username=OWNER_USERNAME,
+                email=OWNER_EMAIL,
                 role="owner",
                 status="active",
                 email_confirmed=True,
             )
-            new_owner.set_password(owner_password)
+            new_owner.set_password(OWNER_PASSWORD)
 
             db.session.add(new_owner)
             db.session.commit()
@@ -101,13 +128,13 @@ def create_app():
             owner.role = "owner"
             owner.email_confirmed = True
             db.session.commit()
-            print(">>> OWNER verificado.")
+            print(">>> OWNER verificado y activo.")
 
     return app
 
 
 # =====================================================
-# EJECUTAR LOCAL
+# EJECUTAR EN LOCAL
 # =====================================================
 if __name__ == "__main__":
     app = create_app()
