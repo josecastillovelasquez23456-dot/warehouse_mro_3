@@ -2,11 +2,10 @@ from io import BytesIO
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
 
 
 # =====================================================================
-# 📌 1. CARGA FLEXIBLE DE INVENTARIO SISTEMA
+# 1. CARGA FLEXIBLE DE INVENTARIO SISTEMA
 # =====================================================================
 def load_inventory_excel(file):
     df = pd.read_excel(file)
@@ -30,7 +29,7 @@ def load_inventory_excel(file):
 
 
 # =====================================================================
-# 📌 2. ORDENAMIENTO AVANZADO DE UBICACIONES
+# 2. ORDENAMIENTO AVANZADO DE UBICACIONES
 # =====================================================================
 def sort_location_advanced(location):
     try:
@@ -43,7 +42,7 @@ def sort_location_advanced(location):
 
 
 # =====================================================================
-# 📌 3. CARGA DEL EXCEL PARA MAPA 2D
+# 3. MAPA 2D
 # =====================================================================
 def load_warehouse2d_excel(file):
     df = pd.read_excel(file)
@@ -70,19 +69,17 @@ def load_warehouse2d_excel(file):
 
 
 # =====================================================================
-# 📌 4. GENERAR EXCEL PROFESIONAL DE DISCREPANCIAS (VERSION FIJA)
+# 4. GENERAR EXCEL PROFESIONAL DE DISCREPANCIAS (FIX DEFINITIVO)
 # =====================================================================
 def generate_discrepancies_excel(df):
     """
-    Genera un archivo Excel válido (sin corrupción).
+    Genera un archivo Excel válido (sin corrupción),
+    compatible con Windows + Railway.
     """
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-    from io import BytesIO
 
     output = BytesIO()
 
-    # VALIDACIÓN SI DF VIENE VACÍO
+    # Si DF está vacío
     if df is None or df.empty:
         wb = Workbook()
         ws = wb.active
@@ -92,23 +89,22 @@ def generate_discrepancies_excel(df):
         output.seek(0)
         return output
 
-    # NORMALIZACIÓN PARA EVITAR VALORES NO SERIALIZABLES
+    # Normalizar todo a texto (evita corrupción)
     df = df.copy()
-    for col in df.columns:
-        df[col] = df[col].astype(str)
+    df = df.astype(str)
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Discrepancias"
 
-    # ESCRIBIR CABECERAS
+    # Cabeceras
     ws.append(list(df.columns))
 
-    # ESCRIBIR FILAS
+    # Filas
     for _, row in df.iterrows():
         ws.append(row.tolist())
 
-    # ESTILOS
+    # Estilos
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="1F4E78")
     center = Alignment(horizontal="center", vertical="center")
@@ -121,13 +117,12 @@ def generate_discrepancies_excel(df):
     thin = Side(border_style="thin", color="000000")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    # BORDES Y AUTOAJUSTE
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             cell.border = border
             cell.alignment = center
 
-    # COLORES POR ESTADO
+    # Colores por estado
     status_colors = {
         "OK": "C6EFCE",
         "FALTA": "FFEB9C",
@@ -136,28 +131,20 @@ def generate_discrepancies_excel(df):
     }
 
     if "Estado" in df.columns:
-        estado_idx = df.columns.get_loc("Estado") + 1  # Excel es 1-indexed
+        idx = list(df.columns).index("Estado") + 1
 
         for row in ws.iter_rows(min_row=2):
-            estado = row[estado_idx - 1].value
+            estado = row[idx - 1].value
             color = status_colors.get(estado)
-
             if color:
                 for cell in row:
                     cell.fill = PatternFill("solid", fgColor=color)
 
-    # AUTO-ANCHO
+    # Auto-ancho
     for col in ws.columns:
-        max_len = 0
-        col_letter = col[0].column_letter
-        for cell in col:
-            try:
-                max_len = max(max_len, len(str(cell.value)))
-            except:
-                pass
-        ws.column_dimensions[col_letter].width = max_len + 3
+        max_len = max(len(str(c.value)) for c in col)
+        ws.column_dimensions[col[0].column_letter].width = max_len + 3
 
-    # FILTRO AUTOMÁTICO
     ws.auto_filter.ref = ws.dimensions
 
     wb.save(output)
