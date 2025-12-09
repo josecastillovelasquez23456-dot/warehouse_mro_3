@@ -7,47 +7,94 @@
 
 <div class="card shadow-sm p-3">
 
-    <input type="text" id="searchCount" class="form-control mb-3"
-           placeholder="🔍 Buscar material para conteo...">
+    <div class="d-flex justify-content-between mb-3">
+
+        <input type="text" id="searchCount" class="form-control w-50"
+               placeholder="🔍 Buscar material, texto o ubicación...">
+
+        <button id="saveCountBtn" class="btn btn-success">
+            <i class="bi bi-check2-circle me-2"></i> Guardar Conteo
+        </button>
+
+    </div>
 
     <div class="table-responsive">
         <table class="table table-striped" id="countTable">
             <thead class="table-dark">
                 <tr>
-                    <th>Material</th>
+                    <th>Código</th>
                     <th>Descripción</th>
                     <th>Ubicación</th>
                     <th>Stock Sistema</th>
                     <th>Conteo Real</th>
                 </tr>
             </thead>
+
             <tbody>
                 {% for i in items %}
-                <tr>
+                <tr data-code="{{ i.material_code }}" data-loc="{{ i.location }}">
                     <td>{{ i.material_code }}</td>
                     <td>{{ i.material_text }}</td>
                     <td>{{ i.location }}</td>
                     <td>{{ i.libre_utilizacion }}</td>
                     <td>
-                        <input type="number" min="0" class="form-control">
+                        <input type="number" min="0" class="form-control count-input"
+                               placeholder="Ingresar conteo...">
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
+
         </table>
     </div>
 
 </div>
 
 <script>
-document.getElementById("searchCount").addEventListener("keyup", function() {
+// 🔍 Filtro de búsqueda
+document.getElementById("searchCount").addEventListener("keyup", function () {
     let filter = this.value.toLowerCase();
-    let rows = document.querySelectorAll("#countTable tbody tr");
-
-    rows.forEach(r => {
-        let txt = r.innerText.toLowerCase();
-        r.style.display = txt.includes(filter) ? "" : "none";
+    document.querySelectorAll("#countTable tbody tr").forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(filter) ? "" : "none";
     });
+});
+
+
+// 📝 GUARDAR TODO EL CONTEO
+document.getElementById("saveCountBtn").addEventListener("click", () => {
+
+    let conteos = [];
+
+    document.querySelectorAll("#countTable tbody tr").forEach(row => {
+        let codigo = row.getAttribute("data-code");
+        let ubic = row.getAttribute("data-loc");
+        let input = row.querySelector(".count-input").value;
+
+        if (input !== "") {
+            conteos.push({
+                codigo: codigo,
+                ubicacion: ubic,
+                real: Number(input),
+            });
+        }
+    });
+
+    if (conteos.length === 0) {
+        alert("⚠ No llenaste ningún conteo.");
+        return;
+    }
+
+    // Enviar conteos al backend
+    fetch("/inventory/save-count", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(conteos)
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert("✅ Conteo guardado correctamente");
+    })
+    .catch(err => alert("❌ Error guardando conteo"));
 });
 </script>
 
