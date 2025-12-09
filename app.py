@@ -13,6 +13,7 @@ login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.login_message_category = "info"
 
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -26,14 +27,14 @@ def create_app():
     app.config.from_object(Config)
 
     # =====================================================
-    # FIX DEFINITIVO PARA RENDER (carpetas de escritura)
+    # FIX PARA CARPETAS DE ESCRITURA
     # =====================================================
     REQUIRED_DIRS = [
         "uploads",
         "uploads/inventory",
         "uploads/history",
         "uploads/bultos",
-        "reports"
+        "reports",
     ]
 
     for d in REQUIRED_DIRS:
@@ -58,7 +59,7 @@ def create_app():
     def format_fecha(value):
         try:
             return value.strftime("%d/%m/%Y %H:%M")
-        except:
+        except Exception:
             return value
 
     # Ruta raíz
@@ -111,8 +112,3 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-
-
-
-
