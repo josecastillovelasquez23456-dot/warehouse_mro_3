@@ -15,13 +15,16 @@
                placeholder="🔍 Buscar material, texto o ubicación…">
 
         <div>
-            <a href="{{ url_for('inventory.discrepancies') }}"
-               class="btn btn-primary btn-lg shadow-sm me-2">
-                <i class="bi bi-file-earmark-excel me-2"></i> Exportar Discrepancias
-            </a>
+            <!-- 📌 Exportar discrepancias automáticamente -->
+            <button id="exportBtn" class="btn btn-primary btn-lg shadow-sm me-2">
+                <i class="bi bi-file-earmark-excel me-2"></i>
+                Exportar Discrepancias
+            </button>
 
+            <!-- 📌 Guardar conteo -->
             <button id="saveCountBtn" class="btn btn-success btn-lg shadow-sm">
-                <i class="bi bi-cloud-check me-2"></i> Guardar Conteo
+                <i class="bi bi-cloud-check me-2"></i>
+                Guardar Conteo
             </button>
         </div>
 
@@ -65,9 +68,9 @@
 
 <!-- ========================== SCRIPTS ========================== -->
 <script>
-// ==================================================
-// 🔍 BÚSQUEDA EN TIEMPO REAL
-// ==================================================
+/* ==================================================
+   🔍 BÚSQUEDA EN TIEMPO REAL
+   ================================================== */
 document.getElementById("searchCount").addEventListener("input", function () {
     const filter = this.value.toLowerCase();
     document.querySelectorAll("#countTable tbody tr").forEach(row => {
@@ -76,21 +79,22 @@ document.getElementById("searchCount").addEventListener("input", function () {
 });
 
 
-// ==================================================
-// 🎨 EFECTOS EN INPUTS
-// ==================================================
+/* ==================================================
+   🎨 EFECTOS EN INPUTS (colores y navegación)
+   ================================================== */
 document.querySelectorAll(".count-input").forEach(input => {
 
-    // Fondo según si está lleno o vacío
+    // Fondo según si está vacío o lleno
     input.addEventListener("input", () => {
-        input.style.backgroundColor = input.value.trim() === "" ? "#ffe5e5" : "#e6ffe6";
+        input.style.backgroundColor = input.value.trim() === ""
+            ? "#ffe5e5"
+            : "#e6ffe6";
 
-        // Resaltar toda la fila cuando se modifica
-        const row = input.closest("tr");
-        row.style.backgroundColor = "#f7fff0";
+        // Resaltar fila modificada
+        input.closest("tr").style.backgroundColor = "#f7fff0";
     });
 
-    // ENTER → pasa al siguiente input
+    // ENTER → ir al siguiente input
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
             const inputs = [...document.querySelectorAll(".count-input")];
@@ -102,9 +106,9 @@ document.querySelectorAll(".count-input").forEach(input => {
 });
 
 
-// ==================================================
-// 📝 GUARDAR CONTEO
-// ==================================================
+/* ==================================================
+   📝 GUARDAR CONTEO (YA FUNCIONA CON TU BACKEND)
+   ================================================== */
 document.getElementById("saveCountBtn").addEventListener("click", () => {
 
     const conteos = [];
@@ -134,10 +138,10 @@ document.getElementById("saveCountBtn").addEventListener("click", () => {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.ok) {
+        if (data.success) {
+
             alert("✅ Conteo guardado correctamente.");
 
-            // Limpia colores de edición
             document.querySelectorAll(".count-input").forEach(i => {
                 i.style.backgroundColor = "white";
             });
@@ -148,6 +152,50 @@ document.getElementById("saveCountBtn").addEventListener("click", () => {
     })
     .catch(err => {
         alert("❌ Error conectando con el servidor.");
+    });
+});
+
+
+/* ==================================================
+   📌 EXPORTAR DISCREPANCIAS DIRECTO A EXCEL (sin archivo)
+   ================================================== */
+document.getElementById("exportBtn").addEventListener("click", () => {
+
+    const conteos = [];
+
+    document.querySelectorAll("#countTable tbody tr").forEach(row => {
+        const material_code = row.dataset.code;
+        const location = row.dataset.loc;
+        const input = row.querySelector(".count-input").value.trim();
+
+        if (input !== "") {
+            conteos.push({
+                material_code,
+                location,
+                real_count: Number(input)
+            });
+        }
+    });
+
+    if (conteos.length === 0) {
+        return alert("⚠ Debe ingresar mínimo un conteo para generar discrepancias.");
+    }
+
+    fetch("/inventory/export-discrepancies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(conteos)
+    })
+    .then(r => r.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "discrepancias.xlsx";
+        a.click();
+
+        window.URL.revokeObjectURL(url);
     });
 });
 </script>
