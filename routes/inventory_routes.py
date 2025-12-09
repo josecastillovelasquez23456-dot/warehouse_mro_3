@@ -10,14 +10,17 @@ from flask import (
     url_for,
     flash,
     send_file,
+    jsonify
 )
 from flask_login import login_required
 
-# 📌 IMPORTS PARA RAILWAY
+# 📌 MODELOS
 from models import db
 from models.inventory import InventoryItem
 from models.inventory_history import InventoryHistory
+from models.inventory_count import InventoryCount   # 👈 NUEVO MODELO PARA CONTEOS
 
+# 📌 UTILIDADES
 from utils.excel import (
     load_inventory_excel,
     sort_location_advanced,
@@ -48,11 +51,11 @@ def upload_inventory():
             flash(f"Error procesando el archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory"))
 
-        # Reemplazar inventario existente
+        # Limpiar inventario actual
         InventoryItem.query.delete()
         db.session.commit()
 
-        # Guardar inventario
+        # Guardar inventario actual
         for _, row in df.iterrows():
             item = InventoryItem(
                 material_code=row["Código del Material"],
@@ -89,7 +92,7 @@ def upload_inventory():
 
 
 # =============================================================================
-# 📌 2. SUBIR INVENTARIOS ANTIGUOS
+# 📌 2. SUBIR INVENTARIOS ANTIGUOS (HISTÓRICOS)
 # =============================================================================
 
 @inventory_bp.route("/upload-history", methods=["GET", "POST"])
@@ -160,7 +163,42 @@ def count_inventory():
 
 
 # =============================================================================
-# 📌 5. DASHBOARD DE INVENTARIO (NUEVO)
+# 📌 4.1 GUARDAR CONTEO REAL (NUEVO)
+# =============================================================================
+
+@inventory_bp.route("/save-count", methods=["POST"])
+@login_required
+def save_count():
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"success": False, "msg": "No se recibió información"}), 400
+
+        # limpiar conteo anterior
+        InventoryCount.query.delete()
+
+        for c in data:
+            nuevo = InventoryCount(
+                material_code=c["codigo"],
+                location=c["ubicacion"],
+                real_count=int(c["real"]),
+                fecha=datetime.now()
+            )
+            db.session.add(nuevo)
+
+        db.session.commit()
+
+        return jsonify({"success": True, "msg": "Conteo guardado correctamente"})
+
+    except Exception as e:
+        print("❌ ERROR SAVE COUNT:", e)
+        return jsonify({"success": False, "msg": "Error del servidor"}), 500
+
+
+
+# =============================================================================
+# 📌 5. DASHBOARD DE INVENTARIO
 # =============================================================================
 
 @inventory_bp.route("/dashboard")
@@ -180,23 +218,16 @@ def dashboard_inventory():
     for i in items:
         if i.libre_utilizacion == 0:
             estados["CRITICO"] += 1
-            i.estado = "CRÍTICO"
         elif i.libre_utilizacion < 5:
             estados["FALTA"] += 1
-            i.estado = "FALTA"
         elif i.libre_utilizacion > 50:
             estados["SOBRA"] += 1
-            i.estado = "SOBRA"
         else:
             estados["OK"] += 1
-            i.estado = "OK"
 
     ubicaciones = {}
     for i in items:
         ubicaciones[i.location] = ubicaciones.get(i.location, 0) + 1
-
-    ubicaciones_labels = list(ubicaciones.keys())
-    ubicaciones_counts = list(ubicaciones.values())
 
     return render_template(
         "inventory/dashboard.html",
@@ -205,8 +236,8 @@ def dashboard_inventory():
         criticos=criticos,
         faltantes=faltantes,
         estados=estados,
-        ubicaciones_labels=ubicaciones_labels,
-        ubicaciones_counts=ubicaciones_counts,
+        ubicaciones_labels=list(ubicaciones.keys()),
+        ubicaciones_counts=list(ubicaciones.values()),
         items=items
     )
 
@@ -258,6 +289,7 @@ def discrepancies():
             "Libre utilización": "Stock contado"
         })
 
+        # mezclar
         merged = sistema.merge(conteo, on=["Código Material", "Ubicación"], how="outer")
 
         merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
@@ -277,6 +309,7 @@ def discrepancies():
 
         merged["Estado"] = estados
 
+        # exportar
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
