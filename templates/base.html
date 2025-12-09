@@ -95,6 +95,11 @@
                     <div id="inventoryMenu" class="accordion-collapse collapse">
                         <div class="accordion-body p-0">
 
+                            <a href="{{ url_for('inventory.dashboard_inventory') }}"
+                               class="list-group-item bg-dark text-white">
+                                📊 Dashboard Inventario
+                            </a>
+
                             <a href="{{ url_for('inventory.list_inventory') }}"
                                class="list-group-item bg-dark text-white">
                                 📚 Inventario actual
@@ -103,6 +108,11 @@
                             <a href="{{ url_for('inventory.upload_inventory') }}"
                                class="list-group-item bg-dark text-white">
                                 ⬆ Cargar inventario base
+                            </a>
+
+                            <a href="{{ url_for('inventory.upload_inventory_history') }}"
+                               class="list-group-item bg-dark text-white">
+                                🕒 Subir inventarios antiguos
                             </a>
 
                             <a href="{{ url_for('inventory.count_inventory') }}"
@@ -115,7 +125,6 @@
 
                 </div>
             </div>
-            <!-- ======================== FIN INVENTARIO ======================== -->
 
             <!-- ======================== ALMACÉN 2D ======================== -->
             <a href="{{ url_for('warehouse2d.map_view') }}" class="list-group-item">
@@ -164,8 +173,8 @@
 
                 </div>
             </div>
-            <!-- ======================== FIN BULTOS ======================== -->
 
+            <!-- ======================== ACCIONES VARIAS ======================== -->
             <a href="{{ url_for('technician_errors.list_errors') }}" class="list-group-item">
                 <i class="bi bi-tools me-2"></i>Errores Técnicos
             </a>
