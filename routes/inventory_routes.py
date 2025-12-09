@@ -257,8 +257,9 @@ def export_discrepancies_auto():
             excel,
             as_attachment=True,
             download_name=fname,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            mimetype="application/vnd.ms-excel"
         )
+
 
     except Exception as e:
         print("❌ ERROR EXPORT-DISCREP:", e)
@@ -306,3 +307,4 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
+
