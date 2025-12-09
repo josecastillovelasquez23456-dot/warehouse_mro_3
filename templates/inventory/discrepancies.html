@@ -1,35 +1,32 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="row mb-3">
-    <div class="col">
-        <h4>Generar Discrepancias de Inventario</h4>
-        <p class="text-muted mb-0">
-            Cargue el archivo de conteo físico (mismas columnas que el inventario). Se comparará contra el stock del sistema
-            y se generará un Excel con el detalle de diferencias.
-        </p>
-    </div>
+
+<h2 class="fw-bold mb-4">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Generar Discrepancias de Inventario
+</h2>
+
+<div class="card shadow-sm p-4">
+
+    <form method="POST" enctype="multipart/form-data">
+
+        <label class="form-label fw-semibold">Seleccionar archivo del conteo:</label>
+        <input type="file" name="file" accept=".xlsx" class="form-control mb-3" required>
+
+        <button class="btn btn-danger px-4">
+            <i class="bi bi-file-earmark-excel me-2"></i>
+            Generar Excel de Discrepancias
+        </button>
+
+    </form>
+
+    <hr>
+
+    <p class="text-muted small">
+        El Excel debe contener:
+        <strong>Código del Material, Ubicación, Libre utilización</strong>
+    </p>
+
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <form method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label class="form-label">Archivo Excel de conteo físico</label>
-                <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
-                <div class="form-text">
-                    Columnas requeridas:
-                    <code>Código del Material</code>,
-                    <code>Texto breve de material</code>,
-                    <code>Unidad de medida base</code>,
-                    <code>Ubicación</code>,
-                    <code>Libre utilización</code> (representa el stock contado).
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-file-earmark-arrow-down me-1"></i>Generar archivo de discrepancias
-            </button>
-        </form>
-    </div>
-</div>
 {% endblock %}
