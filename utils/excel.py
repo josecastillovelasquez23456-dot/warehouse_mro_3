@@ -6,7 +6,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 
 
 # =====================================================================
-# 📌 1. CARGA FLEXIBLE DE INVENTARIO
+# 📌 1. CARGA FLEXIBLE DE INVENTARIO SISTEMA
 # =====================================================================
 def load_inventory_excel(file):
     """
@@ -33,17 +33,16 @@ def load_inventory_excel(file):
     return df
 
 
+
 # =====================================================================
-# 📌 2. ORDENAMIENTO AVANZADO DE UBICACIONES (E001B01, PLANTA, etc.)
+# 📌 2. ORDENAMIENTO AVANZADO DE UBICACIONES (E001B01, PLANTA etc.)
 # =====================================================================
 def sort_location_advanced(location):
     """
     Ordena ubicaciones tipo:
     - E006B01
     - E010A03
-    - PLANTA
-    - PATIO
-    Evita errores cuando la ubicación es texto puro.
+    - PLANTA, PATIO, etc.
     """
     try:
         if isinstance(location, str) and location.startswith("E"):
@@ -54,15 +53,51 @@ def sort_location_advanced(location):
         return 999999
 
 
+
 # =====================================================================
-# 📌 3. GENERAR EXCEL PROFESIONAL DE DISCREPANCIAS
+# 📌 3. CARGA DEL EXCEL PARA MAPA 2D (FALTA EN TU SISTEMA)
+# =====================================================================
+def load_warehouse2d_excel(file):
+    """
+    Carga el Excel para el módulo ALMACÉN 2D.
+    Valida columnas industriales estándar.
+    """
+
+    df = pd.read_excel(file)
+
+    columnas_requeridas = [
+        "Código del Material",
+        "Texto breve de material",
+        "Unidad de medida base",
+        "Ubicación",
+        "Stock máximo",
+        "Consumo mes actual",
+        "Libre utilización",
+        "Tamaño de lote mínimo"
+    ]
+
+    for col in columnas_requeridas:
+        if col not in df.columns:
+            raise Exception(f"❌ Falta la columna obligatoria en mapa 2D: {col}")
+
+    # Normalización
+    df["Código del Material"] = df["Código del Material"].astype(str).str.strip()
+    df["Ubicación"] = df["Ubicación"].astype(str).str.strip()
+
+    return df
+
+
+
+# =====================================================================
+# 📌 4. GENERAR EXCEL PROFESIONAL DE DISCREPANCIAS
 # =====================================================================
 def generate_discrepancies_excel(df):
     """
-    Genera un Excel profesional con formato GERDAU:
+    Genera un Excel profesional:
     - Encabezado azul
-    - Colores por estado (OK, FALTA, CRÍTICO, SOBRA)
+    - Colores GERDAU por estado
     - Autoajuste de columnas
+    - Bordes
     - Filtros automáticos
     """
 
@@ -71,13 +106,13 @@ def generate_discrepancies_excel(df):
     ws = wb.active
     ws.title = "Discrepancias"
 
-    # -------- AGREGAR DATAFRAME --------
+    # -------- DATAFRAME A EXCEL --------
     for r in dataframe_to_rows(df, index=False, header=True):
         ws.append(r)
 
     # -------- ESTILOS --------
     header_font = Font(bold=True, color="FFFFFF", size=12)
-    header_fill = PatternFill("solid", fgColor="1F4E78")  # Azul industrial
+    header_fill = PatternFill("solid", fgColor="1F4E78")
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     thin = Side(border_style="thin", color="000000")
@@ -90,25 +125,23 @@ def generate_discrepancies_excel(df):
         cell.alignment = center
         cell.border = border
 
-    # -------- AUTO-WIDTH --------
+    # -------- AUTO WIDTH --------
     for col in ws.columns:
         max_len = 0
         col_letter = col[0].column_letter
-
         for cell in col:
             try:
                 max_len = max(max_len, len(str(cell.value)))
             except:
                 pass
-
         ws.column_dimensions[col_letter].width = max_len + 3
 
     # -------- COLORES POR ESTADO --------
     status_colors = {
-        "OK": "C6EFCE",        # verde
-        "FALTA": "FFEB9C",     # amarillo
-        "CRÍTICO": "FFC7CE",   # rojo
-        "SOBRA": "BDD7EE",     # celeste
+        "OK": "C6EFCE",
+        "FALTA": "FFEB9C",
+        "CRÍTICO": "FFC7CE",
+        "SOBRA": "BDD7EE",
     }
 
     estado_index = df.columns.get_loc("Estado")
@@ -128,7 +161,6 @@ def generate_discrepancies_excel(df):
     # Filtros
     ws.auto_filter.ref = ws.dimensions
 
-    # Guardar en buffer
     wb.save(output)
     output.seek(0)
     return output
