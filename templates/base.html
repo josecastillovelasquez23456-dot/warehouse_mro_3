@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>warehouse_mro</title>
+    <title>WAREHOUSE MRO</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap -->  
@@ -51,7 +51,7 @@
             color: #f8c000 !important;
         }
         .accordion-body .list-group-item {
-            padding-left: 40px;
+            padding-left: 40px !important;
         }
     </style>
 
@@ -79,39 +79,36 @@
             </a>
 
             <!-- ======================== INVENTARIO ======================== -->
-            <div class="accordion accordion-flush" id="accordionInventory">
+            <div class="accordion" id="accordionInventory">
 
                 <div class="accordion-item bg-dark border-0">
 
                     <h2 class="accordion-header">
-                        <button class="accordion-button collapsed bg-dark text-white"
+                        <button class="accordion-button collapsed"
                                 type="button"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#inventoryMenu">
                             <i class="bi bi-box-seam me-2"></i> Inventario
                         </button>
-                    </h2`
+                    </h2>
 
-                    <div id="inventoryMenu" class="accordion-collapse collapse" data-bs-parent="#accordionInventory">
+                    <div id="inventoryMenu" class="accordion-collapse collapse">
                         <div class="accordion-body p-0">
 
-                            <a href="{{ url_for('inventory.dashboard_inventory') }}" class="list-group-item bg-dark text-white">
-                                📊 Dashboard Inventario
-                            </a>
-
-                            <a href="{{ url_for('inventory.list_inventory') }}" class="list-group-item bg-dark text-white">
+                            <a href="{{ url_for('inventory.list_inventory') }}"
+                               class="list-group-item bg-dark text-white">
                                 📚 Inventario actual
                             </a>
 
-                            <a href="{{ url_for('inventory.upload_inventory') }}" class="list-group-item bg-dark text-white">
+                            <a href="{{ url_for('inventory.upload_inventory') }}"
+                               class="list-group-item bg-dark text-white">
                                 ⬆ Cargar inventario base
                             </a>
 
-                            <a href="{{ url_for('inventory.upload_inventory_history') }}" class="list-group-item bg-dark text-white">
-                                🕒 Subir inventarios antiguos
+                            <a href="{{ url_for('inventory.count_inventory') }}"
+                               class="list-group-item bg-dark text-white">
+                                🔢 Conteo de inventario
                             </a>
-
-                            <!-- Discrepancias solo va como botón dentro de Conteo -->
 
                         </div>
                     </div>
@@ -125,18 +122,21 @@
                 <i class="bi bi-grid-3x3-gap-fill me-2"></i>Almacén 2D
             </a>
 
-            <!-- ======================== BULTOS (PROFESIONAL) ======================== -->
+            <!-- ======================== BULTOS ======================== -->
             <div class="accordion" id="accordionBultos">
+
                 <div class="accordion-item bg-dark border-0">
 
                     <h2 class="accordion-header">
-                        <button class="accordion-button collapsed" type="button"
-                                data-bs-toggle="collapse" data-bs-target="#collapseBultos">
-                            <i class="bi bi-truck me-2"></i>Bultos
+                        <button class="accordion-button collapsed"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#bultosMenu">
+                            <i class="bi bi-truck me-2"></i> Bultos
                         </button>
                     </h2>
 
-                    <div id="collapseBultos" class="accordion-collapse collapse">
+                    <div id="bultosMenu" class="accordion-collapse collapse">
                         <div class="accordion-body p-0">
 
                             <a href="{{ url_for('bultos.new_bulto') }}"
@@ -156,7 +156,7 @@
 
                             <a href="{{ url_for('bultos.historial_post') }}"
                                class="list-group-item bg-dark text-white">
-                                📋 Historial de Conteos
+                                📋 Historial
                             </a>
 
                         </div>
@@ -202,24 +202,13 @@
                 <i class="bi bi-robot me-2"></i>Alertas Inteligentes
             </a>
 
-            <!-- ======================== ROLES ======================== -->
             {% if current_user.role == "owner" %}
-            <div class="role-title"><i class="bi bi-shield-lock-fill me-2"></i>Administración Owner</div>
+            <div class="role-title">
+                <i class="bi bi-shield-lock-fill me-2"></i>Administración Owner
+            </div>
             <a href="{{ url_for('admin_roles.listar_roles') }}" class="list-group-item">
                 <i class="bi bi-people-fill me-2"></i>Gestión de Roles
             </a>
-            {% endif %}
-
-            {% if current_user.role == "admin" %}
-            <div class="role-title text-info">
-                <i class="bi bi-person-badge-fill me-2"></i>Panel Admin
-            </div>
-            {% endif %}
-
-            {% if current_user.role == "user" %}
-            <div class="role-title text-secondary">
-                <i class="bi bi-person me-2"></i>Usuario Básico
-            </div>
             {% endif %}
 
         </div>
@@ -263,17 +252,6 @@
         </nav>
 
         <div class="container-fluid py-4">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                        {{ message }}
-                        <button class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
             {% block content %}{% endblock %}
         </div>
 
