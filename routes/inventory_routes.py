@@ -27,9 +27,9 @@ from utils.excel import (
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
 
-# ============================================================================
+# =============================================================================
 # 📌 1. CARGA DE INVENTARIO BASE
-# ============================================================================
+# =============================================================================
 
 @inventory_bp.route("/upload", methods=["GET", "POST"])
 @login_required
@@ -52,7 +52,7 @@ def upload_inventory():
         InventoryItem.query.delete()
         db.session.commit()
 
-        # Guardar inventario en la tabla principal
+        # Guardar inventario
         for _, row in df.iterrows():
             item = InventoryItem(
                 material_code=row["Código del Material"],
@@ -63,7 +63,7 @@ def upload_inventory():
             )
             db.session.add(item)
 
-        # Crear snapshot del inventario
+        # Crear snapshot histórico
         snapshot_id = str(uuid.uuid4())
         snapshot_name = f"Inventario {datetime.now():%d/%m/%Y %H:%M}"
 
@@ -88,9 +88,9 @@ def upload_inventory():
 
 
 
-# ============================================================================
+# =============================================================================
 # 📌 2. SUBIR INVENTARIOS ANTIGUOS
-# ============================================================================
+# =============================================================================
 
 @inventory_bp.route("/upload-history", methods=["GET", "POST"])
 @login_required
@@ -112,7 +112,6 @@ def upload_inventory_history():
         snapshot_id = str(uuid.uuid4())
         snapshot_name = f"Histórico {datetime.now():%d/%m/%Y %H:%M}"
 
-        # Guardar archivo en la tabla de historial
         for _, row in df.iterrows():
             hist = InventoryHistory(
                 snapshot_id=snapshot_id,
@@ -126,6 +125,7 @@ def upload_inventory_history():
             db.session.add(hist)
 
         db.session.commit()
+
         flash("Inventario histórico subido correctamente.", "success")
         return redirect(url_for("inventory.list_inventory"))
 
@@ -133,9 +133,9 @@ def upload_inventory_history():
 
 
 
-# ============================================================================
-# 📌 3. LISTAR INVENTARIO (DEFAULT)
-# ============================================================================
+# =============================================================================
+# 📌 3. LISTAR INVENTARIO PRINCIPAL
+# =============================================================================
 
 @inventory_bp.route("/list")
 @login_required
@@ -146,9 +146,9 @@ def list_inventory():
 
 
 
-# ============================================================================
+# =============================================================================
 # 📌 4. CONTEO EN LÍNEA
-# ============================================================================
+# =============================================================================
 
 @inventory_bp.route("/count")
 @login_required
@@ -159,9 +159,62 @@ def count_inventory():
 
 
 
-# ============================================================================
-# 📌 5. DISCREPANCIAS
-# ============================================================================
+# =============================================================================
+# 📌 5. DASHBOARD DE INVENTARIO (NUEVO)
+# =============================================================================
+
+@inventory_bp.route("/dashboard")
+@login_required
+def dashboard_inventory():
+
+    items = InventoryItem.query.all()
+
+    total_items = len(items)
+    ubicaciones_unicas = len(set(i.location for i in items))
+
+    criticos = sum(1 for i in items if i.libre_utilizacion <= 0)
+    faltantes = sum(1 for i in items if 0 < i.libre_utilizacion < 5)
+
+    estados = {"OK": 0, "FALTA": 0, "CRITICO": 0, "SOBRA": 0}
+
+    for i in items:
+        if i.libre_utilizacion == 0:
+            estados["CRITICO"] += 1
+            i.estado = "CRÍTICO"
+        elif i.libre_utilizacion < 5:
+            estados["FALTA"] += 1
+            i.estado = "FALTA"
+        elif i.libre_utilizacion > 50:
+            estados["SOBRA"] += 1
+            i.estado = "SOBRA"
+        else:
+            estados["OK"] += 1
+            i.estado = "OK"
+
+    ubicaciones = {}
+    for i in items:
+        ubicaciones[i.location] = ubicaciones.get(i.location, 0) + 1
+
+    ubicaciones_labels = list(ubicaciones.keys())
+    ubicaciones_counts = list(ubicaciones.values())
+
+    return render_template(
+        "inventory/dashboard.html",
+        total_items=total_items,
+        ubicaciones_unicas=ubicaciones_unicas,
+        criticos=criticos,
+        faltantes=faltantes,
+        estados=estados,
+        ubicaciones_labels=ubicaciones_labels,
+        ubicaciones_counts=ubicaciones_counts,
+        items=items
+    )
+
+
+
+# =============================================================================
+# 📌 6. DISCREPANCIAS
+# =============================================================================
 
 @inventory_bp.route("/discrepancies", methods=["GET", "POST"])
 @login_required
@@ -183,7 +236,7 @@ def discrepancies():
         df["Código del Material"] = df["Código del Material"].astype(str)
         df["Ubicación"] = df["Ubicación"].astype(str)
 
-        # Inventario del sistema
+        # Inventario sistema
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -205,7 +258,6 @@ def discrepancies():
             "Libre utilización": "Stock contado"
         })
 
-        # Mezclar ambos
         merged = sistema.merge(conteo, on=["Código Material", "Ubicación"], how="outer")
 
         merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
@@ -225,7 +277,6 @@ def discrepancies():
 
         merged["Estado"] = estados
 
-        # Exportar Excel
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
