@@ -6,7 +6,7 @@ class PostRegistro(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     bulto_id = db.Column(db.Integer, db.ForeignKey("bultos.id"), nullable=False)
-
+    observacion = db.Column(db.String(255))
     codigo_material = db.Column(db.String(120))
     cantidad_sistema = db.Column(db.Integer)
     cantidad_real = db.Column(db.Integer)
