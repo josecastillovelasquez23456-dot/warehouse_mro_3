@@ -6,11 +6,14 @@ class PostRegistro(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     bulto_id = db.Column(db.Integer, db.ForeignKey("bultos.id"), nullable=False)
-    observacion = db.Column(db.String(255))
+
     codigo_material = db.Column(db.String(120))
     cantidad_sistema = db.Column(db.Integer)
     cantidad_real = db.Column(db.Integer)
     diferencia = db.Column(db.Integer)
+
+    observacion = db.Column(db.String(255))   # ← 🔥 ESTA LÍNEA ES LA QUE TE FALTABA
+
     registrado_por = db.Column(db.String(100))
     fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
 
