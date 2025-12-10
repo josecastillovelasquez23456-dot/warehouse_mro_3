@@ -50,6 +50,9 @@ def upload_inventory():
             flash(f"Error procesando archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory"))
 
+        # Normalizar ubicaciones del Excel base
+        df["Ubicación"] = df["Ubicación"].astype(str).str.replace(" ", "").str.upper()
+
         # Limpiar inventario anterior y conteos
         InventoryItem.query.delete()
         InventoryCount.query.delete()
@@ -62,7 +65,7 @@ def upload_inventory():
                     material_code=row["Código del Material"],
                     material_text=row["Texto breve de material"],
                     base_unit=row["Unidad de medida base"],
-                    location=row["Ubicación"],
+                    location=row["Ubicación"],   # ubicación ya normalizada
                     libre_utilizacion=row["Libre utilización"],
                 )
             )
@@ -79,7 +82,7 @@ def upload_inventory():
                     material_code=row["Código del Material"],
                     material_text=row["Texto breve de material"],
                     base_unit=row["Unidad de medida base"],
-                    location=row["Ubicación"],
+                    location=row["Ubicación"],   # ubicación ya normalizada
                     libre_utilizacion=row["Libre utilización"],
                 )
             )
@@ -92,7 +95,7 @@ def upload_inventory():
 
 
 # =============================================================================
-# 2. SUBIR INVENTARIOS HISTÓRICOS (PARA EL MENÚ LATERAL)
+# 2. SUBIR INVENTARIOS HISTÓRICOS
 # =============================================================================
 @inventory_bp.route("/upload-history", methods=["GET", "POST"])
 @login_required
@@ -110,6 +113,9 @@ def upload_inventory_history():
         except Exception as e:
             flash(f"Error procesando archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory_history"))
+
+        # Normalizar ubicaciones
+        df["Ubicación"] = df["Ubicación"].astype(str).str.replace(" ", "").str.upper()
 
         snapshot_id = str(uuid.uuid4())
         snapshot_name = f"Histórico {datetime.now():%d/%m/%Y %H:%M}"
@@ -135,7 +141,7 @@ def upload_inventory_history():
 
 
 # =============================================================================
-# 3. LISTA DE INVENTARIO
+# 3. LISTA INVENTARIO
 # =============================================================================
 @inventory_bp.route("/list")
 @login_required
@@ -146,7 +152,7 @@ def list_inventory():
 
 
 # =============================================================================
-# 4. CONTEO DE INVENTARIO (EN LÍNEA)
+# 4. PANTALLA DE CONTEO
 # =============================================================================
 @inventory_bp.route("/count")
 @login_required
@@ -157,7 +163,7 @@ def count_inventory():
 
 
 # =============================================================================
-# 5. GUARDAR CONTEO (VIENE DEL FRONT)
+# 5. GUARDAR CONTEO
 # =============================================================================
 @inventory_bp.route("/save-count", methods=["POST"])
 @login_required
@@ -175,7 +181,7 @@ def save_count():
         for c in data:
             nuevo = InventoryCount(
                 material_code=c["material_code"],
-                location=c["location"],
+                location=c["location"].replace(" ", "").upper(),
                 real_count=int(c["real_count"]),
                 fecha=datetime.now(),
             )
@@ -188,8 +194,9 @@ def save_count():
         print("❌ ERROR SAVE COUNT:", e)
         return jsonify({"success": False}), 500
 
+
 # =============================================================================
-# 6. EXPORTAR DISCREPANCIAS DESDE EL CONTEO EN PANTALLA (VERSIÓN FINAL)
+# 6. EXPORTAR DISCREPANCIAS (VERSIÓN FINAL PRO)
 # =============================================================================
 @inventory_bp.route("/export-discrepancies", methods=["POST"])
 @login_required
@@ -201,7 +208,9 @@ def export_discrepancies_auto():
         if not conteo:
             return jsonify({"success": False, "msg": "No se recibió conteo"}), 400
 
-        # Inventario actual limpio
+        # ===============================
+        # INVENTARIO SISTEMA
+        # ===============================
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -213,13 +222,16 @@ def export_discrepancies_auto():
             db.session.bind,
         )
 
-        # 🔥 NORMALIZAR INVENTARIO (PARA QUE HAGA MATCH)
+        # Normalizar inventario
         sistema["Código Material"] = sistema["Código Material"].astype(str).str.strip()
-        sistema["Ubicación"] = sistema["Ubicación"].astype(str).str.strip()
+        sistema["Ubicación"] = (
+            sistema["Ubicación"].astype(str).str.replace(" ", "").str.upper()
+        )
 
-        # Conteo recibido
-        conteo_df = pd.DataFrame(conteo)
-        conteo_df = conteo_df.rename(
+        # ===============================
+        # CONTEO DEL FRONT
+        # ===============================
+        conteo_df = pd.DataFrame(conteo).rename(
             columns={
                 "material_code": "Código Material",
                 "location": "Ubicación",
@@ -227,37 +239,40 @@ def export_discrepancies_auto():
             }
         )
 
-        # 🔥 NORMALIZAR CONTEO
         conteo_df["Código Material"] = conteo_df["Código Material"].astype(str).str.strip()
-        conteo_df["Ubicación"] = conteo_df["Ubicación"].astype(str).str.strip()
+        conteo_df["Ubicación"] = (
+            conteo_df["Ubicación"].astype(str).str.replace(" ", "").str.upper()
+        )
 
-        # Mezclar inventario real y sistema
+        # ===============================
+        # MERGE
+        # ===============================
         merged = sistema.merge(
-            conteo_df, on=["Código Material", "Ubicación"], how="outer"
+            conteo_df,
+            on=["Código Material", "Ubicación"],
+            how="outer"
         ).fillna(0)
 
-        # Si está vacío → Excel no se corrompe, devuelve mensaje
-        if merged.empty:
-            merged = pd.DataFrame(
-                {"Mensaje": ["No hay coincidencias entre sistema y conteo."]}
-            )
-
+        # ===============================
+        # DIFERENCIAS Y ESTADOS
+        # ===============================
         merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
 
-        # Estado
-        condiciones = []
+        estados = []
         for _, r in merged.iterrows():
             diff = r["Diferencia"]
             if diff == 0:
-                condiciones.append("OK")
+                estados.append("OK")
             elif diff < 0:
-                condiciones.append("CRÍTICO" if diff <= -10 else "FALTA")
+                estados.append("CRÍTICO" if diff <= -10 else "FALTA")
             else:
-                condiciones.append("SOBRA")
+                estados.append("SOBRA")
 
-        merged["Estado"] = condiciones
+        merged["Estado"] = estados
 
-        # Generar Excel
+        # ===============================
+        # EXPORTAR EXCEL
+        # ===============================
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -265,15 +280,16 @@ def export_discrepancies_auto():
             excel,
             as_attachment=True,
             download_name=fname,
-            mimetype="application/vnd.ms-excel"
+            mimetype="application/vnd.ms-excel",
         )
 
     except Exception as e:
         print("❌ ERROR EXPORT-DISCREP:", e)
         return jsonify({"success": False, "msg": "Error generando Excel"}), 500
 
+
 # =============================================================================
-# 7. DASHBOARD DE INVENTARIO (PARA EL SIDEBAR)
+# 7. DASHBOARD INVENTARIO
 # =============================================================================
 @inventory_bp.route("/dashboard")
 @login_required
@@ -313,7 +329,3 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
-
-
-
-
