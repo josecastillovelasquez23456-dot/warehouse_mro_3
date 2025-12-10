@@ -188,17 +188,12 @@ def save_count():
         print("❌ ERROR SAVE COUNT:", e)
         return jsonify({"success": False}), 500
 
-
 # =============================================================================
-# 6. EXPORTAR DISCREPANCIAS DESDE EL CONTEO EN PANTALLA
+# 6. EXPORTAR DISCREPANCIAS DESDE EL CONTEO EN PANTALLA (VERSIÓN FINAL)
 # =============================================================================
 @inventory_bp.route("/export-discrepancies", methods=["POST"])
 @login_required
 def export_discrepancies_auto():
-    """
-    Recibe el conteo actual desde el front,
-    cruza con InventoryItem y devuelve un Excel válido.
-    """
 
     try:
         conteo = request.get_json()
@@ -206,7 +201,9 @@ def export_discrepancies_auto():
         if not conteo:
             return jsonify({"success": False, "msg": "No se recibió conteo"}), 400
 
+        # -------------------------
         # Inventario sistema base
+        # -------------------------
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -218,27 +215,36 @@ def export_discrepancies_auto():
             db.session.bind,
         )
 
-        # Conteo ingresado
+        # -------------------------
+        # Conteo recibido
+        # -------------------------
         conteo_df = pd.DataFrame(conteo)
-        conteo_df = conteo_df.rename(columns={
-            "material_code": "Código Material",
-            "location": "Ubicación",
-            "real_count": "Stock contado",
-        })
+        conteo_df = conteo_df.rename(
+            columns={
+                "material_code": "Código Material",
+                "location": "Ubicación",
+                "real_count": "Stock contado",
+            }
+        )
 
-        # Merge sistema + conteo
+        # -------------------------
+        # Mezcla
+        # -------------------------
         merged = sistema.merge(
             conteo_df, on=["Código Material", "Ubicación"], how="outer"
         )
 
-        merged["Stock sistema"] = merged["Stock sistema"].fillna(0)
-        merged["Stock contado"] = merged["Stock contado"].fillna(0)
+        merged["Stock sistema"] = merged["Stock sistema"].fillna(0).astype(float)
+        merged["Stock contado"] = merged["Stock contado"].fillna(0).astype(float)
+
         merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
 
-        # Estado
+        # -------------------------
+        # Estados
+        # -------------------------
         estados = []
         for _, r in merged.iterrows():
-            diff = float(r["Diferencia"])
+            diff = r["Diferencia"]
             if diff == 0:
                 estados.append("OK")
             elif diff < 0:
@@ -248,7 +254,17 @@ def export_discrepancies_auto():
 
         merged["Estado"] = estados
 
-        # Excel final
+        # =========================
+        # NORMALIZACIÓN ABSOLUTA
+        # =========================
+        merged = merged.fillna("")
+        merged = merged.astype(str)
+        for col in merged.columns:
+            merged[col] = merged[col].str.replace("\x00", "", regex=False)
+
+        # -------------------------
+        # Generar Excel
+        # -------------------------
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -256,9 +272,7 @@ def export_discrepancies_auto():
             excel,
             as_attachment=True,
             download_name=fname,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            max_age=0,
-            conditional=False
+            mimetype="application/vnd.ms-excel",
         )
 
     except Exception as e:
@@ -306,5 +320,6 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
+
 
 
