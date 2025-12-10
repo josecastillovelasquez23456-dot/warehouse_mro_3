@@ -1,7 +1,6 @@
 from models import db
 from datetime import datetime
 
-
 class InventoryItem(db.Model):
     __tablename__ = "inventory"
 
@@ -29,3 +28,4 @@ class InventoryItem(db.Model):
 
     def __repr__(self):
         return f"<InventoryItem {self.material_code} - {self.location}>"
+
