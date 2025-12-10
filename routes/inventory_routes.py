@@ -201,9 +201,7 @@ def export_discrepancies_auto():
         if not conteo:
             return jsonify({"success": False, "msg": "No se recibió conteo"}), 400
 
-        # -------------------------
-        # Inventario sistema base
-        # -------------------------
+        # Inventario actual limpio
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -215,9 +213,11 @@ def export_discrepancies_auto():
             db.session.bind,
         )
 
-        # -------------------------
+        # 🔥 NORMALIZAR INVENTARIO (PARA QUE HAGA MATCH)
+        sistema["Código Material"] = sistema["Código Material"].astype(str).str.strip()
+        sistema["Ubicación"] = sistema["Ubicación"].astype(str).str.strip()
+
         # Conteo recibido
-        # -------------------------
         conteo_df = pd.DataFrame(conteo)
         conteo_df = conteo_df.rename(
             columns={
@@ -227,44 +227,37 @@ def export_discrepancies_auto():
             }
         )
 
-        # -------------------------
-        # Mezcla
-        # -------------------------
+        # 🔥 NORMALIZAR CONTEO
+        conteo_df["Código Material"] = conteo_df["Código Material"].astype(str).str.strip()
+        conteo_df["Ubicación"] = conteo_df["Ubicación"].astype(str).str.strip()
+
+        # Mezclar inventario real y sistema
         merged = sistema.merge(
             conteo_df, on=["Código Material", "Ubicación"], how="outer"
-        )
+        ).fillna(0)
 
-        merged["Stock sistema"] = merged["Stock sistema"].fillna(0).astype(float)
-        merged["Stock contado"] = merged["Stock contado"].fillna(0).astype(float)
+        # Si está vacío → Excel no se corrompe, devuelve mensaje
+        if merged.empty:
+            merged = pd.DataFrame(
+                {"Mensaje": ["No hay coincidencias entre sistema y conteo."]}
+            )
 
         merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
 
-        # -------------------------
-        # Estados
-        # -------------------------
-        estados = []
+        # Estado
+        condiciones = []
         for _, r in merged.iterrows():
             diff = r["Diferencia"]
             if diff == 0:
-                estados.append("OK")
+                condiciones.append("OK")
             elif diff < 0:
-                estados.append("CRÍTICO" if diff <= -10 else "FALTA")
+                condiciones.append("CRÍTICO" if diff <= -10 else "FALTA")
             else:
-                estados.append("SOBRA")
+                condiciones.append("SOBRA")
 
-        merged["Estado"] = estados
+        merged["Estado"] = condiciones
 
-        # =========================
-        # NORMALIZACIÓN ABSOLUTA
-        # =========================
-        merged = merged.fillna("")
-        merged = merged.astype(str)
-        for col in merged.columns:
-            merged[col] = merged[col].str.replace("\x00", "", regex=False)
-
-        # -------------------------
         # Generar Excel
-        # -------------------------
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -272,7 +265,7 @@ def export_discrepancies_auto():
             excel,
             as_attachment=True,
             download_name=fname,
-            mimetype="application/vnd.ms-excel",
+            mimetype="application/vnd.ms-excel"
         )
 
     except Exception as e:
@@ -320,6 +313,7 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
+
 
 
 
