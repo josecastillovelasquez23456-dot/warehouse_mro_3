@@ -14,6 +14,8 @@ from flask import (
 )
 from flask_login import login_required
 
+from sqlalchemy import select   # FIX SQLALCHEMY 2.0
+
 # MODELOS
 from models import db
 from models.inventory import InventoryItem
@@ -65,7 +67,7 @@ def upload_inventory():
                     material_code=row["Código del Material"],
                     material_text=row["Texto breve de material"],
                     base_unit=row["Unidad de medida base"],
-                    location=row["Ubicación"],   # ubicación ya normalizada
+                    location=row["Ubicación"],
                     libre_utilizacion=row["Libre utilización"],
                 )
             )
@@ -82,7 +84,7 @@ def upload_inventory():
                     material_code=row["Código del Material"],
                     material_text=row["Texto breve de material"],
                     base_unit=row["Unidad de medida base"],
-                    location=row["Ubicación"],   # ubicación ya normalizada
+                    location=row["Ubicación"],
                     libre_utilizacion=row["Libre utilización"],
                 )
             )
@@ -114,7 +116,6 @@ def upload_inventory_history():
             flash(f"Error procesando archivo: {str(e)}", "danger")
             return redirect(url_for("inventory.upload_inventory_history"))
 
-        # Normalizar ubicaciones
         df["Ubicación"] = df["Ubicación"].astype(str).str.replace(" ", "").str.upper()
 
         snapshot_id = str(uuid.uuid4())
@@ -174,10 +175,8 @@ def save_count():
         if not isinstance(data, list):
             return jsonify({"success": False, "msg": "Formato inválido"}), 400
 
-        # Limpiar conteo previo
         InventoryCount.query.delete()
 
-        # Insertar conteo nuevo
         for c in data:
             nuevo = InventoryCount(
                 material_code=c["material_code"],
@@ -196,27 +195,30 @@ def save_count():
 
 
 # =============================================================================
-# 6. EXPORTAR DISCREPANCIAS (VERSIÓN FINAL PRO)
+# 6. EXPORTAR DISCREPANCIAS (FIX SQLALCHEMY 2.0)
 # =============================================================================
 @inventory_bp.route("/export-discrepancies", methods=["POST"])
 @login_required
 def export_discrepancies_auto():
 
-    print("🔥🔥 ENTRO A EXPORT-DISCREPANCIES 🔥🔥")
-
     try:
         conteo = request.get_json()
 
-        sistema = pd.read_sql(
-            db.session.query(
-                InventoryItem.material_code.label("Código Material"),
-                InventoryItem.material_text.label("Descripción"),
-                InventoryItem.base_unit.label("Unidad"),
-                InventoryItem.location.label("Ubicación"),
-                InventoryItem.libre_utilizacion.label("Stock sistema"),
-            ).statement,
-            db.session.bind,
+        # ===========================
+        # FIX SQLALCHEMY 2.0 → SELECT
+        # ===========================
+        query = select(
+            InventoryItem.material_code.label("Código Material"),
+            InventoryItem.material_text.label("Descripción"),
+            InventoryItem.base_unit.label("Unidad"),
+            InventoryItem.location.label("Ubicación"),
+            InventoryItem.libre_utilizacion.label("Stock sistema"),
         )
+
+        # Correcto en Railway
+        engine = db.engine
+
+        sistema = pd.read_sql(query, engine)
 
         sistema["Código Material"] = sistema["Código Material"].astype(str).str.strip()
         sistema["Ubicación"] = sistema["Ubicación"].astype(str).str.strip()
@@ -232,15 +234,17 @@ def export_discrepancies_auto():
             conteo_df["Ubicación"] = conteo_df["Ubicación"].astype(str).str.strip()
 
         merged = sistema.merge(conteo_df, on=["Código Material", "Ubicación"], how="left")
+
         merged["Stock contado"] = merged["Stock contado"].fillna("NO CONTADO")
 
-        merged["Diferencia"] = merged.apply(
-            lambda r: 0 if r["Stock contado"] == "NO CONTADO"
-            else int(r["Stock contado"]) - int(r["Stock sistema"]),
-            axis=1
-        )
+        def calc_diff(r):
+            if r["Stock contado"] == "NO CONTADO":
+                return 0
+            return int(r["Stock contado"]) - int(r["Stock sistema"])
 
-        def calcular_estado(r):
+        merged["Diferencia"] = merged.apply(calc_diff, axis=1)
+
+        def calc_estado(r):
             if r["Stock contado"] == "NO CONTADO":
                 return "NO CONTADO"
             diff = r["Diferencia"]
@@ -250,7 +254,7 @@ def export_discrepancies_auto():
                 return "CRÍTICO" if diff <= -10 else "FALTA"
             return "SOBRA"
 
-        merged["Estado"] = merged.apply(calcular_estado, axis=1)
+        merged["Estado"] = merged.apply(calc_estado, axis=1)
 
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
@@ -263,10 +267,9 @@ def export_discrepancies_auto():
         )
 
     except Exception as e:
-        import traceback
-        print("❌ ERROR EXPORT-DISCREP:")
-        traceback.print_exc()
+        print("❌ ERROR EXPORT-DISCREP:", e)
         return jsonify({"success": False, "msg": "Error generando Excel"}), 500
+
 
 # =============================================================================
 # 7. DASHBOARD INVENTARIO
@@ -309,5 +312,3 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
-
-
