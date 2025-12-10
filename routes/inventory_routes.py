@@ -205,12 +205,7 @@ def export_discrepancies_auto():
     try:
         conteo = request.get_json()
 
-        if not conteo:
-            return jsonify({"success": False, "msg": "No se recibió conteo"}), 400
-
-        # ===============================
-        # INVENTARIO SISTEMA
-        # ===============================
+        # Cargar inventario del sistema
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -222,57 +217,52 @@ def export_discrepancies_auto():
             db.session.bind,
         )
 
-        # Normalizar inventario
+        # Normalizar
         sistema["Código Material"] = sistema["Código Material"].astype(str).str.strip()
-        sistema["Ubicación"] = (
-            sistema["Ubicación"].astype(str).str.replace(" ", "").str.upper()
-        )
+        sistema["Ubicación"] = sistema["Ubicación"].astype(str).str.strip()
 
-        # ===============================
-        # CONTEO DEL FRONT
-        # ===============================
-        conteo_df = pd.DataFrame(conteo).rename(
-            columns={
+        # Convertir conteo del usuario
+        conteo_df = pd.DataFrame(conteo) if conteo else pd.DataFrame()
+        if not conteo_df.empty:
+            conteo_df = conteo_df.rename(columns={
                 "material_code": "Código Material",
                 "location": "Ubicación",
                 "real_count": "Stock contado",
-            }
-        )
+            })
+            conteo_df["Código Material"] = conteo_df["Código Material"].astype(str).str.strip()
+            conteo_df["Ubicación"] = conteo_df["Ubicación"].astype(str).str.strip()
 
-        conteo_df["Código Material"] = conteo_df["Código Material"].astype(str).str.strip()
-        conteo_df["Ubicación"] = (
-            conteo_df["Ubicación"].astype(str).str.replace(" ", "").str.upper()
-        )
-
-        # ===============================
-        # MERGE
-        # ===============================
+        # Merge tipo B (TODOS los materiales)
         merged = sistema.merge(
             conteo_df,
             on=["Código Material", "Ubicación"],
-            how="outer"
-        ).fillna(0)
+            how="left"
+        )
 
-        # ===============================
-        # DIFERENCIAS Y ESTADOS
-        # ===============================
-        merged["Diferencia"] = merged["Stock contado"] - merged["Stock sistema"]
+        # Completar valores faltantes
+        merged["Stock contado"] = merged["Stock contado"].fillna("NO CONTADO")
 
-        estados = []
-        for _, r in merged.iterrows():
+        # Diferencia
+        merged["Diferencia"] = merged.apply(
+            lambda r: 0 if r["Stock contado"] == "NO CONTADO" 
+            else int(r["Stock contado"]) - int(r["Stock sistema"]),
+            axis=1
+        )
+
+        # Estado
+        def calcular_estado(r):
+            if r["Stock contado"] == "NO CONTADO":
+                return "NO CONTADO"
             diff = r["Diferencia"]
             if diff == 0:
-                estados.append("OK")
-            elif diff < 0:
-                estados.append("CRÍTICO" if diff <= -10 else "FALTA")
-            else:
-                estados.append("SOBRA")
+                return "OK"
+            if diff < 0:
+                return "CRÍTICO" if diff <= -10 else "FALTA"
+            return "SOBRA"
 
-        merged["Estado"] = estados
+        merged["Estado"] = merged.apply(calcular_estado, axis=1)
 
-        # ===============================
-        # EXPORTAR EXCEL
-        # ===============================
+        # Generar Excel
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -280,13 +270,12 @@ def export_discrepancies_auto():
             excel,
             as_attachment=True,
             download_name=fname,
-            mimetype="application/vnd.ms-excel",
+            mimetype="application/vnd.ms-excel"
         )
 
     except Exception as e:
         print("❌ ERROR EXPORT-DISCREP:", e)
         return jsonify({"success": False, "msg": "Error generando Excel"}), 500
-
 
 # =============================================================================
 # 7. DASHBOARD INVENTARIO
@@ -329,3 +318,4 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
+
