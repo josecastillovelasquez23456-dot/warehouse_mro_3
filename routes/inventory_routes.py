@@ -202,10 +202,11 @@ def save_count():
 @login_required
 def export_discrepancies_auto():
 
+    print("🔥🔥 ENTRO A EXPORT-DISCREPANCIES 🔥🔥")
+
     try:
         conteo = request.get_json()
 
-        # Cargar inventario del sistema
         sistema = pd.read_sql(
             db.session.query(
                 InventoryItem.material_code.label("Código Material"),
@@ -217,11 +218,9 @@ def export_discrepancies_auto():
             db.session.bind,
         )
 
-        # Normalizar
         sistema["Código Material"] = sistema["Código Material"].astype(str).str.strip()
         sistema["Ubicación"] = sistema["Ubicación"].astype(str).str.strip()
 
-        # Convertir conteo del usuario
         conteo_df = pd.DataFrame(conteo) if conteo else pd.DataFrame()
         if not conteo_df.empty:
             conteo_df = conteo_df.rename(columns={
@@ -232,24 +231,15 @@ def export_discrepancies_auto():
             conteo_df["Código Material"] = conteo_df["Código Material"].astype(str).str.strip()
             conteo_df["Ubicación"] = conteo_df["Ubicación"].astype(str).str.strip()
 
-        # Merge tipo B (TODOS los materiales)
-        merged = sistema.merge(
-            conteo_df,
-            on=["Código Material", "Ubicación"],
-            how="left"
-        )
-
-        # Completar valores faltantes
+        merged = sistema.merge(conteo_df, on=["Código Material", "Ubicación"], how="left")
         merged["Stock contado"] = merged["Stock contado"].fillna("NO CONTADO")
 
-        # Diferencia
         merged["Diferencia"] = merged.apply(
-            lambda r: 0 if r["Stock contado"] == "NO CONTADO" 
+            lambda r: 0 if r["Stock contado"] == "NO CONTADO"
             else int(r["Stock contado"]) - int(r["Stock sistema"]),
             axis=1
         )
 
-        # Estado
         def calcular_estado(r):
             if r["Stock contado"] == "NO CONTADO":
                 return "NO CONTADO"
@@ -262,7 +252,6 @@ def export_discrepancies_auto():
 
         merged["Estado"] = merged.apply(calcular_estado, axis=1)
 
-        # Generar Excel
         excel = generate_discrepancies_excel(merged)
         fname = f"discrepancias_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
@@ -274,7 +263,9 @@ def export_discrepancies_auto():
         )
 
     except Exception as e:
-        print("❌ ERROR EXPORT-DISCREP:", e)
+        import traceback
+        print("❌ ERROR EXPORT-DISCREP:")
+        traceback.print_exc()
         return jsonify({"success": False, "msg": "Error generando Excel"}), 500
 
 # =============================================================================
@@ -318,4 +309,5 @@ def dashboard_inventory():
         ubicaciones_counts=list(ubicaciones.values()),
         items=items,
     )
+
 
